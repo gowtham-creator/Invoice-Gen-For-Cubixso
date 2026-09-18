@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.gstack/
+
+# Local build cache and test artifacts
+.next.old-*
+node_modules.broken-*
