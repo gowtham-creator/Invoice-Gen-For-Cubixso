@@ -25,8 +25,8 @@ import type { Invoice } from "../lib/invoice-types";
 import { computeTotals, effectivePlaceOfSupply } from "../lib/invoice-math";
 import { currencyOf, formatMoney } from "../lib/currency";
 import { amountInWords } from "../lib/amount-in-words";
-import { BUILTIN_SEAL, formatPlaceOfSupply, signatureSrc } from "../lib/defaults";
-import { FONT, INK, MUTED, PAGE_MARGIN, RULE, RULE_SOFT, TYPE, totalSize } from "./theme";
+import { formatPlaceOfSupply, isCustomSignature } from "../lib/defaults";
+import { FONT, PAGE_MARGIN, PALETTES, liftForDark, totalSize, typeFor, type Palette, type Variant } from "./theme";
 
 Font.register({
   family: FONT,
@@ -42,16 +42,23 @@ Font.register({
 // looks like a typo on a document someone is going to file. Off entirely.
 Font.registerHyphenationCallback((word) => [word]);
 
-const s = StyleSheet.create({
+/**
+ * The stylesheet for one palette. Built once per variant at module load, so
+ * switching the theme swaps a finished stylesheet rather than rebuilding one on
+ * every keystroke.
+ */
+function buildStyles(p: Palette) {
+  const TYPE = typeFor(p);
+  return StyleSheet.create({
   page: {
     fontFamily: FONT,
     fontSize: 8.5,
-    color: INK,
+    color: p.ink,
     paddingTop: PAGE_MARGIN,
     paddingBottom: PAGE_MARGIN + 14,
     paddingHorizontal: PAGE_MARGIN,
     lineHeight: 1.45,
-    backgroundColor: "#ffffff",
+    backgroundColor: p.paper,
   },
 
   masthead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
@@ -64,11 +71,11 @@ const s = StyleSheet.create({
   docType: { ...TYPE.docTitle, textAlign: "right" },
   docNumber: { ...TYPE.docNumber, textAlign: "right", marginTop: 3 },
 
-  rule: { borderTopWidth: 1, borderTopColor: RULE, marginVertical: 18 },
-  ruleSoft: { borderTopWidth: 1, borderTopColor: RULE_SOFT },
+  rule: { borderTopWidth: 1, borderTopColor: p.rule, marginVertical: 18 },
+  ruleSoft: { borderTopWidth: 1, borderTopColor: p.ruleSoft },
   /* Rows close themselves underneath, so the header rule is not doubled
      and the last row still has an edge below it. */
-  rowRule: { borderBottomWidth: 1, borderBottomColor: RULE_SOFT },
+  rowRule: { borderBottomWidth: 1, borderBottomColor: p.ruleSoft },
 
   eyebrow: { ...TYPE.overline, marginBottom: 6 },
 
@@ -99,14 +106,14 @@ const s = StyleSheet.create({
      box: the template separates with rules, never with filled panels. */
   grand: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end",
-    borderTopWidth: 1, borderTopColor: INK, marginTop: 12, paddingTop: 10,
+    borderTopWidth: 1, borderTopColor: p.ruleStrong, marginTop: 12, paddingTop: 10,
   },
   grandLabel: { ...TYPE.totalLabel },
   grandSub: { ...TYPE.subValue, marginTop: 3 },
   grandValue: { ...TYPE.total, lineHeight: 1 },
 
   words: { ...TYPE.body, marginTop: 16 },
-  wordsValue: { color: INK },
+  wordsValue: { color: p.ink },
 
   notes: { marginTop: 20 },
   kv: { flexDirection: "row", marginBottom: 2 },
@@ -129,10 +136,14 @@ const s = StyleSheet.create({
   /* Bounded on both axes to the signature line's width: a 7:1 signature at a
      fixed height alone renders ~400pt wide and runs off the page. */
   signImage: { width: 190, height: 40, objectFit: "contain", objectPosition: "right", marginBottom: 2 },
-  signRule: { borderTopWidth: 1, borderTopColor: RULE, width: 190, marginTop: 4, paddingTop: 4 },
+  signRule: { borderTopWidth: 1, borderTopColor: p.rule, width: 190, marginTop: 4, paddingTop: 4 },
 
   footer: { ...TYPE.caption, position: "absolute", bottom: PAGE_MARGIN - 16, left: PAGE_MARGIN },
-});
+  });
+}
+
+const STYLES = { light: buildStyles(PALETTES.light), dark: buildStyles(PALETTES.dark) };
+type Styles = (typeof STYLES)[Variant];
 
 /** Table geometry, kept in one place so header and body can never disagree. */
 const COLS_GST = { idx: "4%", desc: "34%", hsn: "10%", qty: "8%", rate: "15%", tax: "8%", amt: "21%" };
@@ -167,16 +178,38 @@ function Lines({ text, style }: { text: string; style?: PdfStyle }) {
   );
 }
 
-function Eyebrow({ children }: { children: string }) {
+function Eyebrow({ children, s }: { children: string; s: Styles }) {
   return <Text style={s.eyebrow}>{children}</Text>;
 }
 
-export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
+export function InvoiceDocument({
+  invoice,
+  variant = "light",
+  darkSignature,
+}: {
+  invoice: Invoice;
+  /**
+   * "dark" follows the template's dark mode, for reading on a dark screen.
+   * Anything that leaves the app (downloads, exports, the preview screen) is
+   * rendered "light": that is the document a client files and prints.
+   */
+  variant?: Variant;
+  /** An uploaded signature redrawn in light ink, for the dark variant. */
+  darkSignature?: string;
+}) {
+  const s = STYLES[variant];
+  const p = PALETTES[variant];
   const t = computeTotals(invoice);
   const c = currencyOf(invoice.currencyCode);
   const isGst = invoice.kind === "gst";
   const col = isGst ? COLS_GST : COLS_PLAIN;
-  const accent = invoice.accent || "#0066cc";
+  const baseAccent = invoice.accent || "#0066cc";
+  const accent = variant === "dark" ? liftForDark(baseAccent) : baseAccent;
+  // The built-in signature has a light-ink twin; an upload is redrawn by the
+  // preview (see darkSignature) since it cannot be known ahead of time.
+  const signature = isCustomSignature(invoice)
+    ? variant === "dark" && darkSignature ? darkSignature : (invoice.signatureImage as string)
+    : p.signature;
   const totalText = formatMoney(t.grandTotalMinor, c);
   const totalSizePt = totalSize(totalText);
   const pos = formatPlaceOfSupply(effectivePlaceOfSupply(invoice));
@@ -212,7 +245,7 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
             {invoice.showLogo && (
               <View style={s.brandRow}>
                 {/* eslint-disable-next-line jsx-a11y/alt-text */}
-                <Image src="/cubixso-logo.png" style={s.logo} />
+                <Image src={p.logo} style={s.logo} />
                 <View>
                   <Text style={s.wordmark}>{invoice.seller.name.split(" ")[0].toUpperCase()}</Text>
                   <Text style={s.brandSub}>
@@ -235,7 +268,7 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
         {/* Parties */}
         <View style={s.parties}>
           <View style={s.party}>
-            <Eyebrow>From</Eyebrow>
+            <Eyebrow s={s}>From</Eyebrow>
             <Text style={s.partyName}>{invoice.seller.name}</Text>
             <Lines text={invoice.seller.address} style={s.partyLine} />
             {isGst && invoice.seller.gstin ? (
@@ -249,7 +282,7 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
           </View>
 
           <View style={s.party}>
-            <Eyebrow>Billed to</Eyebrow>
+            <Eyebrow s={s}>Billed to</Eyebrow>
             <Text style={s.partyName}>{invoice.buyer.name || "—"}</Text>
             <Lines text={invoice.buyer.address} style={s.partyLine} />
             {isGst && invoice.buyer.gstin ? (
@@ -263,21 +296,21 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
         {/* Meta */}
         <View style={s.metaRow}>
           <View style={s.metaCell}>
-            <Eyebrow>Issue date</Eyebrow>
+            <Eyebrow s={s}>Issue date</Eyebrow>
             <Text style={s.metaValue}>{fmtDate(invoice.issueDate)}</Text>
           </View>
           <View style={s.metaCell}>
-            <Eyebrow>Due date</Eyebrow>
+            <Eyebrow s={s}>Due date</Eyebrow>
             <Text style={s.metaValue}>{fmtDate(invoice.dueDate)}</Text>
           </View>
           {isGst && (
             <View style={s.metaCell}>
-              <Eyebrow>Place of supply</Eyebrow>
+              <Eyebrow s={s}>Place of supply</Eyebrow>
               <Text style={s.metaValue}>{pos || "—"}</Text>
             </View>
           )}
           <View style={s.metaCell}>
-            <Eyebrow>Currency</Eyebrow>
+            <Eyebrow s={s}>Currency</Eyebrow>
             <Text style={s.metaValue}>
               {c.code} · {c.name}
             </Text>
@@ -302,7 +335,7 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
           const line = t.lines[i];
           return (
             <View key={item.id} style={[s.tr, s.rowRule]} wrap={false}>
-              <Text style={[s.num, { width: col.idx, textAlign: "left", color: MUTED }]}>
+              <Text style={[s.num, { width: col.idx, textAlign: "left", color: p.muted }]}>
                 {String(i + 1).padStart(2, "0")}
               </Text>
               <View style={{ width: descWidth, paddingRight: 8 }}>
@@ -332,25 +365,26 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
           <View style={s.totals}>
             {showDiscount && (
               <>
-                <Row label="Gross" value={formatMoney(t.subtotalMinor, c)} />
-                <Row label="Discount" value={`−${formatMoney(t.discountMinor, c)}`} />
+                <Row s={s} label="Gross" value={formatMoney(t.subtotalMinor, c)} />
+                <Row s={s} label="Discount" value={`−${formatMoney(t.discountMinor, c)}`} />
               </>
             )}
-            <Row label={isGst ? "Taxable value" : "Subtotal"} value={formatMoney(t.taxableMinor, c)} />
+            <Row s={s} label={isGst ? "Taxable value" : "Subtotal"} value={formatMoney(t.taxableMinor, c)} />
 
             {isGst && t.intraState && (
               <>
-                <Row label={`CGST${rateSuffix(rates)}`} value={formatMoney(t.cgstMinor, c)} />
-                <Row label={`SGST${rateSuffix(rates)}`} value={formatMoney(t.sgstMinor, c)} />
+                <Row s={s} label={`CGST${rateSuffix(rates)}`} value={formatMoney(t.cgstMinor, c)} />
+                <Row s={s} label={`SGST${rateSuffix(rates)}`} value={formatMoney(t.sgstMinor, c)} />
               </>
             )}
             {isGst && !t.intraState && (
-              <Row label={`IGST${rateSuffix(rates, false)}`} value={formatMoney(t.igstMinor, c)} />
+              <Row s={s} label={`IGST${rateSuffix(rates, false)}`} value={formatMoney(t.igstMinor, c)} />
             )}
-            {!isGst && <Row label="GST @ 0%" value={formatMoney(0, c)} />}
+            {!isGst && <Row s={s} label="GST @ 0%" value={formatMoney(0, c)} />}
 
             {t.roundOffMinor !== 0 && (
               <Row
+                s={s}
                 label="Round off"
                 value={`${t.roundOffMinor > 0 ? "+" : "−"}${formatMoney(Math.abs(t.roundOffMinor), c)}`}
               />
@@ -389,7 +423,7 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
             at a single rate the totals ladder above already says everything. */}
         {isGst && t.buckets.length > 1 && (
           <View style={{ marginTop: 18 }} wrap={false}>
-            <Eyebrow>Tax summary</Eyebrow>
+            <Eyebrow s={s}>Tax summary</Eyebrow>
             <View style={{ flexDirection: "row", paddingBottom: 5 }}>
               <Text style={[s.th, { width: "20%" }]}>Rate</Text>
               <Text style={[s.th, { width: "27%", textAlign: "right" }]}>Taxable</Text>
@@ -418,7 +452,7 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
 
         {invoice.notes.trim() !== "" && (
           <View style={s.notes} wrap={false}>
-            <Eyebrow>Notes</Eyebrow>
+            <Eyebrow s={s}>Notes</Eyebrow>
             <Lines text={invoice.notes} style={s.body} />
           </View>
         )}
@@ -432,20 +466,20 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
           <View style={s.closeLeft}>
             {invoice.showBank && (
               <View>
-                <Eyebrow>Payment details</Eyebrow>
-                <KV k="Payee" v={invoice.bank.payeeName} />
-                <KV k="Account" v={invoice.bank.accountNumber} />
-                <KV k="Type" v={invoice.bank.accountType} />
-                <KV k="Bank" v={invoice.bank.bankName} />
-                <KV k="Branch" v={invoice.bank.branch} />
-                <KV k="IFSC" v={invoice.bank.ifsc} />
-                <KV k="SWIFT" v={invoice.bank.swift} />
-                <KV k="UPI" v={invoice.bank.upi} />
+                <Eyebrow s={s}>Payment details</Eyebrow>
+                <KV s={s} k="Payee" v={invoice.bank.payeeName} />
+                <KV s={s} k="Account" v={invoice.bank.accountNumber} />
+                <KV s={s} k="Type" v={invoice.bank.accountType} />
+                <KV s={s} k="Bank" v={invoice.bank.bankName} />
+                <KV s={s} k="Branch" v={invoice.bank.branch} />
+                <KV s={s} k="IFSC" v={invoice.bank.ifsc} />
+                <KV s={s} k="SWIFT" v={invoice.bank.swift} />
+                <KV s={s} k="UPI" v={invoice.bank.upi} />
               </View>
             )}
             {invoice.terms.trim() !== "" && (
               <View style={invoice.showBank ? { marginTop: 16 } : undefined}>
-                <Eyebrow>Terms</Eyebrow>
+                <Eyebrow s={s}>Terms</Eyebrow>
                 <Lines text={invoice.terms} style={s.body} />
               </View>
             )}
@@ -460,14 +494,14 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
               {/* Always an image: signatureSrc falls back to the built-in
                   signature, so no saved draft can leave this line blank. */}
               {/* eslint-disable-next-line jsx-a11y/alt-text */}
-              <Image src={signatureSrc(invoice)} style={s.signImage} />
+              <Image src={signature} style={s.signImage} />
               <View style={s.signRule}>
                 <Text style={s.signName}>{invoice.signatoryName || invoice.seller.name}</Text>
                 <Text style={s.signRole}>Authorised Signatory</Text>
               </View>
               {invoice.showStamp && (
                 /* eslint-disable-next-line jsx-a11y/alt-text */
-                <Image src={BUILTIN_SEAL} style={s.seal} />
+                <Image src={p.seal} style={s.seal} />
               )}
             </View>
           )}
@@ -492,7 +526,7 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ s, label, value }: { s: Styles; label: string; value: string }) {
   return (
     <View style={s.totalRow}>
       <Text style={s.totalLabel}>{label}</Text>
@@ -501,7 +535,7 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function KV({ k, v }: { k: string; v: string }) {
+function KV({ s, k, v }: { s: Styles; k: string; v: string }) {
   if (!v.trim()) return null;
   return (
     <View style={s.kv}>

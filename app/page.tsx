@@ -1,22 +1,21 @@
 "use client";
 
 /**
- * The page mounts the workspace in the browser only.
+ * The page mounts the app in the browser only.
  *
- * Everything the workspace shows starts in localStorage: the draft in
- * progress and the invoices already sent. Rendering it on the server (or at
- * build time, for the static export) would draw a blank invoice that the
- * browser then replaces. Loading it client-side means it reads the draft
- * before its first render, and what appears first is what you left.
+ * Everything the app shows lives in localStorage: the invoices you have made.
+ * Rendering it on the server (or at build time, for the static export) would
+ * draw an empty list that the browser then replaces. Loading it client-side
+ * means the first thing drawn is your own invoices.
  */
 
 import dynamic from "next/dynamic";
 
-const Workspace = dynamic(() => import("@/components/workspace"), {
+const App = dynamic(() => import("@/components/app"), {
   ssr: false,
   loading: () => <div className="h-dvh bg-desk" />,
 });
 
 export default function Page() {
-  return <Workspace />;
+  return <App />;
 }
