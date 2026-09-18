@@ -1,22 +1,21 @@
 "use client";
 
 /**
- * The live preview.
+ * The live preview: the real PDF, on the desk.
  *
- * This renders the actual PDF and shows it, rather than drawing an HTML
- * lookalike beside it. It is slower and it means carrying a PDF engine into the
- * browser, and it is still the right call: an HTML preview is a second
- * implementation of the document that will eventually disagree with the file
- * being sent, and the moment you cannot trust the preview it is worth nothing.
+ * This renders the actual PDF and shows it, rather than an HTML lookalike. An
+ * HTML preview is a second implementation of the document that eventually
+ * disagrees with the file being sent, and a preview you cannot trust is worth
+ * nothing. The cost is managed rather than avoided: regeneration is debounced,
+ * and the previous page stays up while the next one renders, so typing never
+ * blanks the sheet.
  *
- * The cost is managed rather than avoided — regeneration is debounced, and the
- * previous page stays on screen while the next one renders, so typing never
- * flashes the pane empty.
+ * The sheet is the only thing here. Download lives in the toolbar, where the
+ * primary action belongs, so this component just reports when a file is ready.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePDF } from "@react-pdf/renderer";
-import { Download, Loader2 } from "lucide-react";
 import type { Invoice } from "@/lib/invoice-types";
 import { InvoiceDocument } from "@/pdf/invoice-document";
 
@@ -32,7 +31,18 @@ function useDebounced<T>(value: T, ms: number): T {
   return settled;
 }
 
-export function Preview({ invoice }: { invoice: Invoice }) {
+export function Preview({
+  invoice,
+  onReady,
+}: {
+  invoice: Invoice;
+  /**
+   * The current PDF's object URL (null until the first render), and whether it
+   * is stale: for the moment after an edit, before the debounce settles and the
+   * renderer catches up, the file on hand is the previous version.
+   */
+  onReady: (url: string | null, stale: boolean) => void;
+}) {
   const settled = useDebounced(invoice, DEBOUNCE_MS);
   const [instance, update] = usePDF({ document: <InvoiceDocument invoice={settled} /> });
 
@@ -42,63 +52,85 @@ export function Preview({ invoice }: { invoice: Invoice }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settled]);
 
-  // Hold the last good URL so the pane never blanks between renders.
-  const lastUrl = useRef<string | null>(null);
-  if (instance.url) lastUrl.current = instance.url;
-  const shown = instance.url ?? lastUrl.current;
+  // Hold the last good URL so the sheet never blanks between renders. Kept in
+  // state and updated during render, React's pattern for remembering a value
+  // from a previous render; a ref read here would be invisible to React.
+  const [lastUrl, setLastUrl] = useState<string | null>(null);
+  if (instance.url && instance.url !== lastUrl) setLastUrl(instance.url);
+  const shown = instance.url ?? lastUrl;
 
-  const filename = `${invoice.kind === "gst" ? "Tax-Invoice" : "Invoice"}-${
-    invoice.number || "draft"
-  }${invoice.buyer.name ? `-${invoice.buyer.name.replace(/[^\w-]+/g, "-")}` : ""}.pdf`;
+  // Stale while the debounce is pending or the renderer is working.
+  const busy = instance.loading || settled !== invoice;
 
-  const busy = instance.loading;
+  useEffect(() => {
+    onReady(shown, busy);
+  }, [shown, busy, onReady]);
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between gap-3 px-6 py-3">
-        <div className="flex items-center gap-2 text-[11px] text-faint">
-          <span
-            className={`h-1.5 w-1.5 rounded-full transition-colors duration-300 ${
-              busy ? "bg-action-bright" : "bg-hairline-bright"
-            }`}
-          />
-          {busy ? "Rendering" : "Up to date"}
+    <div className="flex h-full justify-center overflow-auto px-6 py-8">
+      <div className="relative w-full max-w-[760px]">
+        <div
+          className={`pointer-events-none absolute -top-6 right-0 flex items-center gap-1.5 text-[11px] text-ink-3 transition-opacity duration-200 ${
+            busy && shown ? "opacity-100" : "opacity-0"
+          }`}
+          aria-live="polite"
+        >
+          <span className="size-1.5 animate-pulse rounded-full bg-accent" />
+          Updating
         </div>
 
-        {shown ? (
-          <a
-            href={shown}
-            download={filename}
-            className="inline-flex items-center gap-1.5 rounded-md bg-action px-3 py-1.5 text-[12px] font-medium text-white transition-colors duration-150 hover:bg-action-bright"
-          >
-            <Download size={13} />
-            Download PDF
-          </a>
-        ) : null}
-      </header>
-
-      <div className="scroll-slim flex-1 overflow-auto px-6 pb-6">
-        <div className="mx-auto w-full max-w-[720px]">
+        <div
+          className="aspect-[210/297] w-full overflow-hidden rounded-[3px] bg-white"
+          /* The one real shadow in the interface: a sheet resting on a desk.
+             Nothing in the chrome carries elevation. */
+          style={{ boxShadow: "0 1px 2px rgba(16,24,40,0.06), 0 12px 32px -8px rgba(16,24,40,0.18)" }}
+        >
           {instance.error ? (
-            <p className="rounded-lg border border-alert/40 bg-alert/10 p-4 text-[13px] text-ink">
-              The document could not be rendered: {String(instance.error)}
-            </p>
+            <div className="flex h-full items-center justify-center p-10 text-center text-[13px] text-ink-2">
+              The invoice could not be drawn: {String(instance.error)}
+            </div>
           ) : shown ? (
             <iframe
-              key="preview"
               title="Invoice preview"
-              src={`${shown}#toolbar=0&navpanes=0&view=FitH`}
-              className="h-[min(1040px,calc(100vh-7rem))] w-full rounded-lg bg-paper"
-              /* The one signature shadow in the system: the sheet resting on
-                 the desk. Nothing else in the chrome carries elevation. */
-              style={{ boxShadow: "0 24px 64px -16px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.3)" }}
+              src={`${shown}#toolbar=0&navpanes=0&view=Fit`}
+              className="size-full"
             />
           ) : (
-            <div className="flex h-[70vh] items-center justify-center rounded-lg border border-hairline">
-              <Loader2 size={18} className="animate-spin text-faint" />
-            </div>
+            <SheetSkeleton />
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** The first render, drawn as the page it is about to become. */
+function SheetSkeleton() {
+  const bar = "rounded-sm bg-well animate-pulse";
+  return (
+    <div className="flex h-full flex-col gap-6 p-[6.7%]" aria-label="Preparing the invoice">
+      <div className="flex justify-between">
+        <div className={`${bar} h-6 w-32`} />
+        <div className={`${bar} h-6 w-24`} />
+      </div>
+      <div className="grid grid-cols-2 gap-8">
+        <div className="space-y-2">
+          <div className={`${bar} h-3 w-40`} />
+          <div className={`${bar} h-3 w-32`} />
+          <div className={`${bar} h-3 w-36`} />
+        </div>
+        <div className="space-y-2">
+          <div className={`${bar} h-3 w-40`} />
+          <div className={`${bar} h-3 w-28`} />
+        </div>
+      </div>
+      <div className="space-y-3 pt-4">
+        <div className={`${bar} h-3 w-full`} />
+        <div className={`${bar} h-3 w-full`} />
+        <div className={`${bar} h-3 w-2/3`} />
+      </div>
+      <div className="mt-auto flex justify-end">
+        <div className={`${bar} h-10 w-48`} />
       </div>
     </div>
   );

@@ -17,6 +17,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { parseMoney, toMajorString, type Currency } from "@/lib/currency";
+import { inputClass } from "./controls";
 
 export function MoneyInput({
   valueMinor,
@@ -47,7 +48,7 @@ export function MoneyInput({
   return (
     <div className="relative">
       <span
-        className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[11px] text-faint"
+        className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-[12px] text-ink-3"
         aria-hidden
       >
         {currency.symbol}
@@ -69,9 +70,7 @@ export function MoneyInput({
           setDraft(e.target.value);
           onChange(parseMoney(e.target.value, currency));
         }}
-        className={`tnum w-full rounded-md border border-hairline bg-input py-1.5 pl-6 pr-2 text-[13px] text-ink placeholder:text-faint transition-colors duration-150 hover:border-hairline-bright focus:border-action focus:outline-none ${
-          align === "right" ? "text-right" : ""
-        }`}
+        className={`${inputClass} tnum h-8 pl-7 ${align === "right" ? "text-right" : ""}`}
       />
     </div>
   );
@@ -135,13 +134,11 @@ export function NumberInput({
           setDraft(null);
         }}
         onChange={(e) => commit(e.target.value)}
-        className={`tnum w-full rounded-md border border-hairline bg-input py-1.5 pl-2 text-right text-[13px] text-ink transition-colors duration-150 hover:border-hairline-bright focus:border-action focus:outline-none ${
-          suffix ? "pr-5" : "pr-2"
-        }`}
+        className={`${inputClass} tnum h-8 text-right ${suffix ? "pr-6" : ""}`}
       />
       {suffix ? (
         <span
-          className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[11px] text-faint"
+          className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-[12px] text-ink-3"
           aria-hidden
         >
           {suffix}
