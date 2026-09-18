@@ -31,6 +31,7 @@ import {
 } from "@/lib/storage";
 import { Editor } from "@/components/editor";
 import { Button, Segmented } from "@/components/controls";
+import { ThemeToggle } from "@/components/theme";
 
 /**
  * The PDF engine is browser-only: it needs canvas and font APIs that do not
@@ -114,7 +115,7 @@ export default function Workspace() {
       <header className="flex h-[52px] shrink-0 items-center gap-3 border-b border-line bg-canvas px-4">
         <div className="flex min-w-0 items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/cubixso-logo.png" alt="Cubixso" width={22} height={22} className="shrink-0" />
+          <img src="/cubixso-logo.png" alt="Cubixso" width={22} height={22} className="shrink-0 dark:invert" />
           <span className="text-[13px] font-semibold text-ink">Invoices</span>
           <span className="text-ink-3" aria-hidden>
             /
@@ -126,6 +127,7 @@ export default function Workspace() {
         </div>
 
         <div className="ml-auto flex items-center gap-1.5">
+          <ThemeToggle />
           <Button variant="ghost" onClick={() => setHistoryOpen(true)} title="Your invoices">
             <FileText size={15} />
             <span className="hidden sm:inline">Your invoices</span>
@@ -297,7 +299,7 @@ export default function Workspace() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-[12.5px] font-medium text-white shadow-[0_8px_24px_-8px_rgba(16,24,40,0.4)]"
+            className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-[12.5px] font-medium text-canvas shadow-[0_8px_24px_-8px_rgba(16,24,40,0.4)]"
           >
             <span className="flex items-center gap-2">
               <Check size={14} className="text-[oklch(0.85_0.12_155)]" />

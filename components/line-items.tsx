@@ -76,7 +76,7 @@ export function LineItemsEditor({
 
   return (
     <div>
-      <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+      <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-field shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
         <AnimatePresence initial={false}>
           {invoice.items.map((item, idx) => {
             const line = totals.lines[idx];

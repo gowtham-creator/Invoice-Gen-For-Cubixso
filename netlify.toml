@@ -7,6 +7,10 @@
 
 [build.environment]
   NODE_VERSION = "22"
+  # Netlify auto-installs its Next.js plugin, which expects a server build in
+  # .next. This app is a static export in out/, and Netlify documents that
+  # static-only Next.js sites must skip the plugin or the deploy fails.
+  NETLIFY_NEXT_PLUGIN_SKIP = "true"
 
 # The fonts are immutable and fingerprinted by name, so they can be cached hard.
 # They are also large enough (400 KB each) to be worth not re-fetching.

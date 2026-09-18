@@ -20,7 +20,7 @@ import { ChevronDown } from "lucide-react";
 
 /** The one input surface, shared so every field reads as the same object. */
 export const inputClass =
-  "w-full rounded-md border border-edge bg-white px-2.5 text-[13px] text-ink " +
+  "w-full rounded-md border border-edge bg-field px-2.5 text-[13px] text-ink " +
   "placeholder:text-ink-3 shadow-[0_1px_1px_rgba(16,24,40,0.03)] " +
   "transition-[border-color,box-shadow] duration-150 " +
   "hover:border-edge-strong " +
@@ -192,7 +192,7 @@ export function Segmented<T extends string>({
               {active && (
                 <motion.span
                   layoutId={thumbId}
-                  className="absolute inset-0 rounded-md bg-white shadow-[0_1px_2px_rgba(16,24,40,0.12),0_0_0_0.5px_rgba(16,24,40,0.06)]"
+                  className="absolute inset-0 rounded-md bg-raised shadow-[0_1px_2px_rgba(16,24,40,0.12),0_0_0_0.5px_rgba(16,24,40,0.06)]"
                   transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                 />
               )}
@@ -249,7 +249,7 @@ const buttonStyles: Record<ButtonVariant, string> = {
   primary:
     "bg-accent text-white shadow-[0_1px_2px_rgba(16,24,40,0.15)] hover:bg-accent-strong active:translate-y-px disabled:bg-accent/50",
   secondary:
-    "border border-edge bg-white text-ink shadow-[0_1px_1px_rgba(16,24,40,0.04)] hover:border-edge-strong hover:bg-well active:translate-y-px disabled:text-ink-3",
+    "border border-edge bg-field text-ink shadow-[0_1px_1px_rgba(16,24,40,0.04)] hover:border-edge-strong hover:bg-well active:translate-y-px disabled:text-ink-3",
   ghost: "text-ink-2 hover:bg-well hover:text-ink active:bg-line disabled:text-ink-3",
 };
 
