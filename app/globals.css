@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* `dark:` follows the theme the user picked, not only the OS: the choice is
+   written to data-theme on <html> by the boot script and ThemeProvider. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /**
  * The editor is a quiet, light, native-feeling tool.
  *
@@ -19,6 +23,9 @@
   --color-canvas: oklch(0.996 0.0015 255);
   --color-well: oklch(0.972 0.003 255);
   --color-desk: oklch(0.948 0.005 255);
+  /* Inputs and lists, and the raised thumb of a segmented control. */
+  --color-field: oklch(1 0 0);
+  --color-raised: oklch(1 0 0);
 
   /* Lines. */
   --color-line: oklch(0.918 0.004 255);
@@ -43,6 +50,35 @@
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
 
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/*
+ * Dark. The same structure with the lightness inverted: neutrals keep their
+ * pull toward the brand blue, the desk drops below the editor so the white
+ * sheet stays the brightest thing on screen, and the accent lifts to the
+ * brighter blue DESIGN.md specifies for blue on dark surfaces (Sky Link Blue),
+ * since Action Blue sinks into a dark background.
+ */
+[data-theme="dark"] {
+  --color-canvas: oklch(0.205 0.006 255);
+  --color-well: oklch(0.25 0.007 255);
+  --color-desk: oklch(0.155 0.005 255);
+  --color-field: oklch(0.235 0.007 255);
+  --color-raised: oklch(0.34 0.008 255);
+
+  --color-line: oklch(0.29 0.007 255);
+  --color-edge: oklch(0.36 0.008 255);
+  --color-edge-strong: oklch(0.47 0.01 255);
+
+  --color-ink: oklch(0.955 0.004 255);
+  --color-ink-2: oklch(0.76 0.008 255);
+  --color-ink-3: oklch(0.6 0.01 255);
+
+  --color-accent: oklch(0.64 0.16 252);
+  --color-accent-strong: oklch(0.7 0.15 252);
+  --color-accent-soft: oklch(0.31 0.07 254);
+
+  --color-danger: oklch(0.68 0.17 25);
 }
 
 html,

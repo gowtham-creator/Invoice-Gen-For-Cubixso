@@ -106,7 +106,7 @@ export function Preview({
 
 /** The first render, drawn as the page it is about to become. */
 function SheetSkeleton() {
-  const bar = "rounded-sm bg-well animate-pulse";
+  const bar = "rounded-sm bg-[#eef0f3] animate-pulse";
   return (
     <div className="flex h-full flex-col gap-6 p-[6.7%]" aria-label="Preparing the invoice">
       <div className="flex justify-between">

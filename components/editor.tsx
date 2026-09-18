@@ -285,11 +285,12 @@ export function Editor({
               <Field label="Signatory" value={invoice.signatoryName} onChange={(signatoryName) => set({ signatoryName })} />
 
               {/* Exactly what prints, laid out as it prints: the same resolver
-                  the PDF uses, with the seal beneath the signatory. */}
-              <div className="flex flex-col items-end gap-2 rounded-lg border border-line bg-white px-4 py-3">
+                  the PDF uses, with the seal beneath the signatory. White in
+                  both themes, because it previews ink on paper. */}
+              <div className="flex flex-col items-end gap-2 rounded-lg border border-line bg-white px-4 py-3 text-[#494949]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={signatureSrc(invoice)} alt="Signature" className="h-9 max-w-full object-contain" />
-                <p className="w-full border-t border-line pt-1.5 text-right text-[12px] text-ink-2">
+                <p className="w-full border-t border-[#e2e2e2] pt-1.5 text-right text-[12px]">
                   {invoice.signatoryName} · Authorised Signatory
                 </p>
                 {invoice.showStamp ? (
