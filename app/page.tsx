@@ -101,7 +101,17 @@ export default function Page() {
     <main className="flex h-dvh flex-col overflow-hidden bg-void">
       <header className="flex shrink-0 items-center gap-3 border-b border-hairline px-4 py-2.5">
         <div className="flex items-center gap-2.5">
-          <CubeGlyph />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/cubixso-logo.png"
+            alt=""
+            width={22}
+            height={22}
+            /* The mark is black on transparent, which disappears against the
+               dark chrome. Inverting renders it white while keeping the real
+               artwork, rather than substituting a redrawn light version. */
+            className="shrink-0 invert"
+          />
           <div className="leading-none">
             <p className="text-[12px] font-semibold tracking-[-0.01em]">Cubixso Invoicer</p>
             <p className="mt-0.5 text-[10px] text-faint">
@@ -239,40 +249,5 @@ export default function Page() {
         )}
       </AnimatePresence>
     </main>
-  );
-}
-
-/** The Cubixso mark at nav scale, as inline SVG. */
-function CubeGlyph() {
-  const pts = [90, 30, -30, -90, -150, 150].map((deg) => {
-    const a = (deg * Math.PI) / 180;
-    return [11 + 10 * Math.cos(a), 11 - 10 * Math.sin(a)] as const;
-  });
-  const [top, ur, lr, bot, ll, ul] = pts;
-  const line = (a: readonly [number, number], b: readonly [number, number], t0 = 0.07, t1 = 0.07) => {
-    const x0 = a[0] + (b[0] - a[0]) * t0;
-    const y0 = a[1] + (b[1] - a[1]) * t0;
-    const x1 = a[0] + (b[0] - a[0]) * (1 - t1);
-    const y1 = a[1] + (b[1] - a[1]) * (1 - t1);
-    return `M${x0.toFixed(1)} ${y0.toFixed(1)}L${x1.toFixed(1)} ${y1.toFixed(1)}`;
-  };
-  const mid = [11, 11] as const;
-  return (
-    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden className="shrink-0">
-      {[
-        line(ul, top), line(top, ur), line(ur, lr), line(lr, bot), line(bot, ll), line(ll, ul),
-        line(mid, ul, 0.05, 0.3), line(mid, ur, 0.05, 0.3), line(mid, bot, 0.05, 0.12),
-      ].map((d, i) => (
-        <path
-          key={i}
-          d={d}
-          stroke="currentColor"
-          strokeWidth="2.4"
-          strokeLinecap="round"
-          fill="none"
-          className="text-action-bright"
-        />
-      ))}
-    </svg>
   );
 }

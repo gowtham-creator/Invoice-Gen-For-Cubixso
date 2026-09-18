@@ -26,7 +26,6 @@ import { computeTotals, effectivePlaceOfSupply } from "../lib/invoice-math";
 import { currencyOf, formatMoney } from "../lib/currency";
 import { amountInWords } from "../lib/amount-in-words";
 import { formatPlaceOfSupply } from "../lib/defaults";
-import { CubixsoMark } from "./logo";
 import {
   FAINT, FONT, INK, MUTED, PAGE_MARGIN, PARCHMENT, RULE, RULE_SOFT,
   TRACK_DISPLAY, TRACK_EYEBROW, TRACK_TIGHT,
@@ -59,6 +58,10 @@ const s = StyleSheet.create({
   },
 
   masthead: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  /* The real mark from the Cubixso site, not a redraw. Printed at its own
+     colour: a logo is not a themeable element, so the document's accent recolours
+     the labels around it and leaves the mark alone. */
+  logo: { width: 26, height: 26, objectFit: "contain" },
   brandRow: { flexDirection: "row", alignItems: "center", gap: 9 },
   wordmark: { fontSize: 13, fontWeight: 600, letterSpacing: TRACK_TIGHT },
   brandSub: { fontSize: 7, color: FAINT, letterSpacing: 0.3, marginTop: 1 },
@@ -123,13 +126,19 @@ const s = StyleSheet.create({
   kvVal: { flex: 1, fontSize: 8, fontWeight: 500 },
   body: { fontSize: 8, color: MUTED },
 
-  signBlock: { alignItems: "flex-end", marginTop: 26 },
-  signImage: { height: 54, objectFit: "contain", marginBottom: 2 },
-  signRule: { borderTopWidth: 1, borderTopColor: RULE, width: 150, marginTop: 4, paddingTop: 4 },
+  signOff: { flexDirection: "row", alignItems: "flex-end", gap: 28, marginTop: 22 },
+  signBlock: { width: 190, alignItems: "flex-end" },
+  signFor: { fontSize: 7.5, color: MUTED, textAlign: "right", marginBottom: 4 },
+  signName: { fontSize: 8.5, fontWeight: 500, textAlign: "right" },
+  signRole: { fontSize: 7, color: FAINT, textAlign: "right", marginTop: 1 },
+  /* Bounded on both axes to the signature line's width: a 7:1 signature at a
+     fixed height alone renders ~400pt wide and runs off the page. `contain`
+     keeps a square stamp and a wide signature both inside the same box. */
+  signImage: { width: 170, height: 40, objectFit: "contain", objectPosition: "right", marginBottom: 2 },
+  signRule: { borderTopWidth: 1, borderTopColor: RULE, width: 170, marginTop: 4, paddingTop: 4 },
 
   footer: {
-    position: "absolute", bottom: PAGE_MARGIN - 16, left: PAGE_MARGIN, right: PAGE_MARGIN,
-    flexDirection: "row", justifyContent: "space-between",
+    position: "absolute", bottom: PAGE_MARGIN - 16, left: PAGE_MARGIN,
     fontSize: 6.8, color: FAINT,
   },
 });
@@ -186,6 +195,17 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
   const showHsn = isGst && invoice.items.some((i) => i.hsn.trim() !== "");
   const showDiscount = invoice.items.some((i) => i.discountPercent > 0);
 
+  // The description absorbs whatever the hidden columns would have used, so the
+  // amount column always ends at the right margin and lines up with the totals
+  // ladder beneath it. With fixed widths, hiding HSN and GST left the table 82%
+  // wide and every amount sitting visibly short of the total it adds up to.
+  const pct = (w: string) => Number.parseFloat(w);
+  const descWidth = `${
+    100 -
+    pct(col.idx) - pct(col.qty) - pct(col.rate) - pct(col.amt) -
+    (showHsn ? pct(col.hsn) : 0) - (showTaxCol ? pct(col.tax) : 0)
+  }%`;
+
   return (
     <Document
       title={`${isGst ? "Tax Invoice" : "Invoice"} ${invoice.number} — ${invoice.seller.name}`}
@@ -198,7 +218,8 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
           <View>
             {invoice.showLogo && (
               <View style={s.brandRow}>
-                <CubixsoMark size={26} color={accent} />
+                {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                <Image src="/cubixso-logo.png" style={s.logo} />
                 <View>
                   <Text style={s.wordmark}>{invoice.seller.name.split(" ")[0].toUpperCase()}</Text>
                   <Text style={s.brandSub}>
@@ -273,7 +294,7 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
         {/* Items */}
         <View style={{ flexDirection: "row", paddingBottom: 7 }}>
           <Text style={[s.th, { width: col.idx }]}>#</Text>
-          <Text style={[s.th, { width: col.desc }]}>Description</Text>
+          <Text style={[s.th, { width: descWidth }]}>Description</Text>
           {showHsn && <Text style={[s.th, { width: col.hsn }]}>HSN/SAC</Text>}
           <Text style={[s.th, { width: col.qty, textAlign: "right" }]}>Qty</Text>
           <Text style={[s.th, { width: col.rate, textAlign: "right" }]}>Rate</Text>
@@ -289,7 +310,7 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
               <Text style={[s.num, { width: col.idx, textAlign: "left", color: FAINT }]}>
                 {String(i + 1).padStart(2, "0")}
               </Text>
-              <View style={{ width: col.desc, paddingRight: 8 }}>
+              <View style={{ width: descWidth, paddingRight: 8 }}>
                 <Lines text={item.description || "—"} style={s.cellDesc} />
                 {item.unit ? <Text style={s.cellSub}>Unit: {item.unit}</Text> : null}
                 {showDiscount && item.discountPercent > 0 ? (
@@ -410,17 +431,26 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
           )}
         </View>
 
-        {/* Terms and signature */}
-        <View wrap={false}>
-          {invoice.terms.trim() !== "" && (
-            <View style={{ marginTop: 20 }}>
-              <Eyebrow>Terms</Eyebrow>
-              <Lines text={invoice.terms} style={s.body} />
-            </View>
-          )}
+        {/* Sign-off: terms and signature share one row.
+            Stacked, the pair ran about 10pt taller than what a one-line invoice
+            leaves on page 1, and because it is kept together it jumped whole to
+            page 2 and left a quarter of the first page blank. Side by side it
+            is roughly half the height. */}
+        <View style={s.signOff} wrap={false}>
+          <View style={{ flex: 1 }}>
+            {invoice.terms.trim() !== "" && (
+              <>
+                <Eyebrow>Terms</Eyebrow>
+                <Lines text={invoice.terms} style={s.body} />
+              </>
+            )}
+          </View>
 
           {invoice.showSignature && (
             <View style={s.signBlock}>
+              {/* The conventional Indian sign-off: the company the signatory
+                  acts for above the signature, the capacity below it. */}
+              <Text style={s.signFor}>For {invoice.seller.name}</Text>
               {invoice.signatureImage ? (
                 /* eslint-disable-next-line jsx-a11y/alt-text */
                 <Image src={invoice.signatureImage} style={s.signImage} />
@@ -428,29 +458,27 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
                 <View style={{ height: 40 }} />
               )}
               <View style={s.signRule}>
-                <Text style={{ fontSize: 8.5, fontWeight: 500, textAlign: "right" }}>
-                  {invoice.signatoryName || invoice.seller.name}
-                </Text>
-                <Text style={{ fontSize: 7, color: FAINT, textAlign: "right" }}>
-                  Authorised signatory, {invoice.seller.name}
-                </Text>
+                <Text style={s.signName}>{invoice.signatoryName || invoice.seller.name}</Text>
+                <Text style={s.signRole}>Authorised Signatory</Text>
               </View>
             </View>
           )}
         </View>
 
-        <View style={s.footer} fixed>
-          <Text>
-            {isGst
+        {/* One fixed Text, absolutely positioned against the page, repeated on
+            every page. The original footer, a flex-row View holding two Texts,
+            never rendered, which silently dropped the non-GST disclaimer from
+            every PDF. A "page X of Y" counter was dropped too: react-pdf's
+            `render` Text would not draw in any position tried. The invoice
+            number is written in statically instead, so a loose second page can
+            still be matched to its invoice. */}
+        <Text style={s.footer} fixed>
+          {`No. ${invoice.number || "—"} · ${
+            isGst
               ? "This is a computer-generated tax invoice."
-              : "This invoice is not a tax invoice. GST is not charged (0%)."}
-          </Text>
-          <Text
-            render={({ pageNumber, totalPages }) =>
-              totalPages > 1 ? `${invoice.number} · ${pageNumber}/${totalPages}` : invoice.number
-            }
-          />
-        </View>
+              : "Not a tax invoice. GST is not charged (0%)."
+          }`}
+        </Text>
       </Page>
     </Document>
   );
