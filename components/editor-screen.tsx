@@ -71,12 +71,37 @@ function Loaded({
   const [invoice, setInvoice] = useState<Invoice>(initial);
   const [pane, setPane] = useState<Pane>("edit");
   const opened = useRef(initial);
+  const latest = useRef(initial);
+  const dirty = useRef(false);
 
+  // Saved after a pause in typing, not on every keystroke: a save rewrites the
+  // whole invoice list in storage, synchronously. Opening is not an edit, so
+  // the invoice as loaded is never written.
   useEffect(() => {
-    // Opening is not an edit: skip the write for the invoice as loaded.
+    latest.current = invoice;
     if (invoice === opened.current) return;
-    saveInvoiceContent(id, invoice);
+    dirty.current = true;
+    const t = setTimeout(() => {
+      saveInvoiceContent(id, latest.current);
+      dirty.current = false;
+    }, 400);
+    return () => clearTimeout(t);
   }, [id, invoice]);
+
+  // Leaving the invoice or closing the tab saves at once, so the pause can
+  // never lose the last edit.
+  useEffect(() => {
+    const flush = () => {
+      if (!dirty.current) return;
+      saveInvoiceContent(id, latest.current);
+      dirty.current = false;
+    };
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, [id]);
 
   const set = useCallback((patch: Partial<Invoice>) => {
     setInvoice((prev) => ({ ...prev, ...patch }));

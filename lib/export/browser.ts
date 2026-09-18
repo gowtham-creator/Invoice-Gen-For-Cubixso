@@ -9,8 +9,6 @@
  * variant, or be a keystroke behind; neither must ever reach a client.
  */
 
-import { createElement, type ReactElement } from "react";
-import type { DocumentProps } from "@react-pdf/renderer";
 import type { Invoice } from "../invoice-types";
 import { BUILTIN_SEAL, BUILTIN_SIGNATURE, isCustomSignature } from "../defaults";
 import { exportFileName, type ExportFormat } from "./shared";
@@ -100,12 +98,9 @@ async function lightArtwork(invoice: Invoice) {
 
 async function buildBlob(invoice: Invoice, format: ExportFormat): Promise<Blob> {
   if (format === "pdf") {
-    const [{ pdf }, { InvoiceDocument }] = await Promise.all([
-      import("@react-pdf/renderer"),
-      import("@/pdf/invoice-document"),
-    ]);
-    const doc = createElement(InvoiceDocument, { invoice, variant: "light" });
-    return pdf(doc as unknown as ReactElement<DocumentProps>).toBlob();
+    // In the worker, so building the file never freezes the page.
+    const { renderInvoicePdf } = await import("@/pdf/render");
+    return renderInvoicePdf(invoice, "light");
   }
 
   const art = await lightArtwork(invoice);
