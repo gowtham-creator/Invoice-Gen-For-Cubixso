@@ -90,9 +90,16 @@ export interface Invoice {
   showLogo: boolean;
   showBank: boolean;
   showSignature: boolean;
+  /** The company seal beside the signature. */
+  showStamp: boolean;
   showAmountInWords: boolean;
   signatoryName: string;
-  /** Data URL of an uploaded stamp or signature image. */
+  /**
+   * An uploaded replacement signature, as a data URL. Null means "use the
+   * built-in one", and so does anything that is not a data URL (older drafts
+   * stored file paths here). The built-in signature is therefore permanent: no
+   * saved value can blank it. Only `showSignature` hides the block.
+   */
   signatureImage: string | null;
   /** Accent colour for the document, as a hex string. */
   accent: string;
