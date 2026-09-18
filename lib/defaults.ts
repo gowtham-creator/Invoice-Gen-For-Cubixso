@@ -149,7 +149,9 @@ export function blankInvoice(kind: Invoice["kind"] = "gst"): Invoice {
     showSignature: true,
     showAmountInWords: true,
     signatoryName: "Nayini Gowtham Reddy",
-    signatureImage: null,
+    // Nayini Gowtham Reddy's signature, taken from the Board Resolution. A
+    // transparent PNG, so it sits on the paper rather than in a white box.
+    signatureImage: "/signature.png",
     accent: "#0066cc",
   };
 }

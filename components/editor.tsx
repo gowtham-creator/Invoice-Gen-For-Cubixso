@@ -11,7 +11,7 @@
  */
 
 import { useRef } from "react";
-import { Upload, RotateCcw, Stamp } from "lucide-react";
+import { Upload, RotateCcw, Stamp, PenLine } from "lucide-react";
 import type { BankDetails, Invoice, Party } from "@/lib/invoice-types";
 import { CURRENCIES, currencyOf } from "@/lib/currency";
 import { computeTotals, effectivePlaceOfSupply } from "@/lib/invoice-math";
@@ -289,6 +289,10 @@ export function Editor({
                 <Button onClick={() => fileRef.current?.click()}>
                   <Upload size={12} />
                   Upload image
+                </Button>
+                <Button onClick={() => set({ signatureImage: "/signature.png" })}>
+                  <PenLine size={12} />
+                  My signature
                 </Button>
                 <Button onClick={() => set({ signatureImage: "/cubixso-stamp.png" })}>
                   <Stamp size={12} />
