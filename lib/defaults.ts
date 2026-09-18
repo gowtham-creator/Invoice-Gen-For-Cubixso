@@ -79,8 +79,12 @@ export const BUILTIN_SEAL = "/seal.png";
  * existed held `null`, and that saved value was overriding the new default.
  */
 export function signatureSrc(inv: Pick<Invoice, "signatureImage">): string {
-  const v = inv.signatureImage;
-  return v && v.startsWith("data:") ? v : BUILTIN_SIGNATURE;
+  return isCustomSignature(inv) ? (inv.signatureImage as string) : BUILTIN_SIGNATURE;
+}
+
+/** Whether the invoice carries an uploaded signature rather than the built-in one. */
+export function isCustomSignature(inv: Pick<Invoice, "signatureImage">): boolean {
+  return !!inv.signatureImage && inv.signatureImage.startsWith("data:");
 }
 
 export const GST_RATES = [0, 0.25, 3, 5, 12, 18, 28];

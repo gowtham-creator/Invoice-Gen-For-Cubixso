@@ -1,23 +1,27 @@
 "use client";
 
 /**
- * The live preview: the real PDF, on the desk.
+ * The live invoice beside the editor: the real PDF, on the desk.
  *
- * This renders the actual PDF and shows it, rather than an HTML lookalike. An
- * HTML preview is a second implementation of the document that eventually
- * disagrees with the file being sent, and a preview you cannot trust is worth
- * nothing. The cost is managed rather than avoided: regeneration is debounced,
- * and the previous page stays up while the next one renders, so typing never
- * blanks the sheet.
+ * It renders the actual PDF rather than an HTML lookalike, so what you check
+ * is what the renderer produces. Regeneration is debounced and the previous
+ * page stays up while the next renders, so typing never blanks the sheet.
  *
- * The sheet is the only thing here. Download lives in the toolbar, where the
- * primary action belongs, so this component just reports when a file is ready.
+ * It follows the theme. On a dark screen it shows the template's dark variant
+ * of the invoice, so a bright white page does not glare out of a dark
+ * interface. This sheet is for editing only: downloads, exports and the
+ * preview screen always render the light document, which is what a client
+ * receives.
  */
 
 import { useEffect, useState } from "react";
 import { usePDF } from "@react-pdf/renderer";
 import type { Invoice } from "@/lib/invoice-types";
+import { isCustomSignature } from "@/lib/defaults";
+import { redrawImage } from "@/lib/export/browser";
 import { InvoiceDocument } from "@/pdf/invoice-document";
+import { PALETTES } from "@/pdf/theme";
+import { useTheme } from "./theme";
 
 /** Long enough to skip most intermediate keystrokes, short enough to feel live. */
 const DEBOUNCE_MS = 400;
@@ -31,40 +35,49 @@ function useDebounced<T>(value: T, ms: number): T {
   return settled;
 }
 
-export function Preview({
-  invoice,
-  onReady,
-}: {
-  invoice: Invoice;
-  /**
-   * The current PDF's object URL (null until the first render), and whether it
-   * is stale: for the moment after an edit, before the debounce settles and the
-   * renderer catches up, the file on hand is the previous version.
-   */
-  onReady: (url: string | null, stale: boolean) => void;
-}) {
+/**
+ * An uploaded signature redrawn in the dark palette's ink. The built-in one
+ * has a pre-made twin; an upload cannot be known ahead of time.
+ */
+function useDarkSignature(invoice: Invoice, active: boolean): string | undefined {
+  const [out, setOut] = useState<{ src: string; dark: string } | null>(null);
+  const src = active && isCustomSignature(invoice) ? (invoice.signatureImage as string) : null;
+  useEffect(() => {
+    if (!src || out?.src === src) return;
+    let live = true;
+    redrawImage(src, [245, 245, 245])
+      .then((r) => live && setOut({ src, dark: r.dataUrl }))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [src, out?.src]);
+  return src && out?.src === src ? out.dark : undefined;
+}
+
+export function Preview({ invoice }: { invoice: Invoice }) {
+  const { resolved } = useTheme();
+  const variant = resolved;
   const settled = useDebounced(invoice, DEBOUNCE_MS);
-  const [instance, update] = usePDF({ document: <InvoiceDocument invoice={settled} /> });
+  const darkSignature = useDarkSignature(settled, variant === "dark");
+  const doc = <InvoiceDocument invoice={settled} variant={variant} darkSignature={darkSignature} />;
+  const [instance, update] = usePDF({ document: doc });
 
   useEffect(() => {
-    update(<InvoiceDocument invoice={settled} />);
+    update(<InvoiceDocument invoice={settled} variant={variant} darkSignature={darkSignature} />);
     // `update` is recreated each render by usePDF; depending on it would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settled]);
+  }, [settled, variant, darkSignature]);
 
   // Hold the last good URL so the sheet never blanks between renders. Kept in
   // state and updated during render, React's pattern for remembering a value
-  // from a previous render; a ref read here would be invisible to React.
+  // from a previous render.
   const [lastUrl, setLastUrl] = useState<string | null>(null);
   if (instance.url && instance.url !== lastUrl) setLastUrl(instance.url);
   const shown = instance.url ?? lastUrl;
 
-  // Stale while the debounce is pending or the renderer is working.
   const busy = instance.loading || settled !== invoice;
-
-  useEffect(() => {
-    onReady(shown, busy);
-  }, [shown, busy, onReady]);
+  const paper = PALETTES[variant].paper;
 
   return (
     <div className="flex h-full justify-center overflow-auto px-6 py-8">
@@ -80,23 +93,24 @@ export function Preview({
         </div>
 
         <div
-          className="aspect-[210/297] w-full overflow-hidden rounded-[3px] bg-white"
-          /* The one real shadow in the interface: a sheet resting on a desk.
-             Nothing in the chrome carries elevation. */
-          style={{ boxShadow: "0 1px 2px rgba(16,24,40,0.06), 0 12px 32px -8px rgba(16,24,40,0.18)" }}
+          className="aspect-[210/297] w-full overflow-hidden rounded-[3px] transition-colors duration-300"
+          /* The one real shadow in the interface: a sheet resting on a desk. */
+          style={{
+            background: paper,
+            boxShadow:
+              variant === "dark"
+                ? "0 0 0 1px rgba(255,255,255,0.06), 0 12px 32px -8px rgba(0,0,0,0.6)"
+                : "0 1px 2px rgba(16,24,40,0.06), 0 12px 32px -8px rgba(16,24,40,0.18)",
+          }}
         >
           {instance.error ? (
             <div className="flex h-full items-center justify-center p-10 text-center text-[13px] text-ink-2">
               The invoice could not be drawn: {String(instance.error)}
             </div>
           ) : shown ? (
-            <iframe
-              title="Invoice preview"
-              src={`${shown}#toolbar=0&navpanes=0&view=Fit`}
-              className="size-full"
-            />
+            <iframe title="Invoice" src={`${shown}#toolbar=0&navpanes=0&view=Fit`} className="size-full" />
           ) : (
-            <SheetSkeleton />
+            <SheetSkeleton dark={variant === "dark"} />
           )}
         </div>
       </div>
@@ -105,8 +119,8 @@ export function Preview({
 }
 
 /** The first render, drawn as the page it is about to become. */
-function SheetSkeleton() {
-  const bar = "rounded-sm bg-[#eef0f3] animate-pulse";
+function SheetSkeleton({ dark }: { dark: boolean }) {
+  const bar = `rounded-sm animate-pulse ${dark ? "bg-[#1f1f1f]" : "bg-[#eef0f3]"}`;
   return (
     <div className="flex h-full flex-col gap-6 p-[6.7%]" aria-label="Preparing the invoice">
       <div className="flex justify-between">
