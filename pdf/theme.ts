@@ -1,36 +1,77 @@
 /**
- * Document tokens for the PDF.
+ * Document tokens, taken from the Figma template the invoice is modelled on
+ * (Free Invoice Template.fig, "Minimal - Light" and "Editorial - Light"), not
+ * invented. The template states its own rule: "Everything is Inter and bound to
+ * text styles." Every value below was read out of that file.
  *
- * Taken from the Cubixso design system (DESIGN.md) rather than invented here:
- * near-black ink instead of pure black so the page reads photographic rather
- * than printed, one Action Blue carrying every accent, and hairlines that work
- * as rules rather than borders. The accent is a parameter because the user can
- * recolour a document, but everything else is fixed — a billing document should
- * look the same every time it lands in a client's inbox.
+ * Two things carry most of the look. The heaviest weight is Medium; there is
+ * no bold anywhere, so hierarchy comes from size and tracking rather than
+ * weight. And large figures are set Regular with negative tracking, which is
+ * what makes the total read as confident rather than loud.
  */
 
-export const INK = "#1d1d1f";
-/** Secondary copy: addresses, table headers, captions. */
-export const MUTED = "#6e6e73";
-/** Fine print only — legal lines, footer. */
-export const FAINT = "#8e8e93";
-export const RULE = "#e0e0e0";
-/** Barely-there rule for inside the totals ladder. */
-export const RULE_SOFT = "#f0f0f0";
-export const PARCHMENT = "#f5f5f7";
-export const PAPER = "#ffffff";
+/** Values, names, figures. */
+export const INK = "#0a0a0a";
+/** Secondary values: "Subtotal", "Payable by …". */
+export const INK_SOFT = "#242424";
+/** Labels, addresses, overlines, footer. */
+export const MUTED = "#494949";
+export const RULE = "#e2e2e2";
+export const RULE_SOFT = "#eeeeee";
 
-/** A4 in PostScript points, which is the unit react-pdf lays out in. */
-export const PAGE_MARGIN = 44;
+/** The template is a true A4 with 40pt margins: a 515pt content column. */
+export const PAGE_MARGIN = 40;
 
 export const FONT = "Inter";
 
+/** Tracking in points from the template's percentages, which scale with size. */
+const track = (size: number, percent: number) => (size * percent) / 100;
+
 /**
- * Apple's display sizes carry negative tracking; body text does not. Applying
- * it uniformly is the single most common way a type scale starts to look
- * generic, so the values are held here per-step instead.
+ * The template's text styles, one entry per role. Sizes, weights, tracking
+ * and colour are the template's own; the comment on each names the layer it
+ * came from.
  */
-export const TRACK_DISPLAY = -0.6;
-export const TRACK_TIGHT = -0.3;
-/** Uppercase eyebrow labels need the opposite treatment — open, not tight. */
-export const TRACK_EYEBROW = 0.9;
+export const TYPE = {
+  /** Minimal masthead "INVOICE": Medium 11, +22%. */
+  docTitle: { fontSize: 11, fontWeight: 500, letterSpacing: track(11, 22), color: MUTED, textTransform: "uppercase" },
+  /** Editorial "No. INV-0042": Regular 10. */
+  docNumber: { fontSize: 10, fontWeight: 400, color: INK },
+  /** Editorial brand "STUDIO NOVA": Medium, +16%. */
+  brand: { fontSize: 11, fontWeight: 500, letterSpacing: track(11, 16), color: INK, textTransform: "uppercase" },
+  /** "BILLED TO", "INVOICE NO.", "PAYMENT DETAILS": Medium 7, +8%. */
+  overline: { fontSize: 7, fontWeight: 500, letterSpacing: track(7, 8), color: MUTED, textTransform: "uppercase" },
+  /** Table header "DESCRIPTION", "QTY": Medium 7.5, +8%. */
+  tableHead: { fontSize: 7.5, fontWeight: 500, letterSpacing: track(7.5, 8), color: MUTED, textTransform: "uppercase" },
+  /** "TOTAL DUE": Medium 7.5, +14%. */
+  totalLabel: { fontSize: 7.5, fontWeight: 500, letterSpacing: track(7.5, 14), color: MUTED, textTransform: "uppercase" },
+  /** Client name, line-item title: Medium 9.5. */
+  name: { fontSize: 9.5, fontWeight: 500, color: INK },
+  /** Quantities, rates, amounts: Regular 9.5. */
+  figure: { fontSize: 9.5, fontWeight: 400, color: INK },
+  /** Dates and other meta values: Regular 9. */
+  value: { fontSize: 9, fontWeight: 400, color: INK },
+  /** "Subtotal", "Payable by …": Regular 9. */
+  subValue: { fontSize: 9, fontWeight: 400, color: INK_SOFT },
+  /** Addresses, item detail, bank field names: Regular 8.5. */
+  body: { fontSize: 8.5, fontWeight: 400, color: MUTED },
+  /** Bank values: Regular 8.5 in ink. */
+  bodyInk: { fontSize: 8.5, fontWeight: 400, color: INK },
+  /** Footer: Regular 8. */
+  caption: { fontSize: 8, fontWeight: 400, color: MUTED },
+  /** Editorial grand total: Regular 44, −3%. */
+  total: { fontSize: 44, fontWeight: 400, letterSpacing: track(44, -3), color: INK },
+} as const;
+
+/**
+ * Total figure size for a given amount.
+ *
+ * The template sets the total at 44pt for "$9,975.00". A crore-scale rupee
+ * amount is five characters longer and would run out of the band at that size,
+ * so long figures step down rather than overflow.
+ */
+export function totalSize(text: string): number {
+  if (text.length <= 12) return 40;
+  if (text.length <= 14) return 34;
+  return 28;
+}

@@ -26,10 +26,7 @@ import { computeTotals, effectivePlaceOfSupply } from "../lib/invoice-math";
 import { currencyOf, formatMoney } from "../lib/currency";
 import { amountInWords } from "../lib/amount-in-words";
 import { BUILTIN_SEAL, formatPlaceOfSupply, signatureSrc } from "../lib/defaults";
-import {
-  FAINT, FONT, INK, MUTED, PAGE_MARGIN, PARCHMENT, RULE, RULE_SOFT,
-  TRACK_DISPLAY, TRACK_EYEBROW, TRACK_TIGHT,
-} from "./theme";
+import { FONT, INK, MUTED, PAGE_MARGIN, RULE, RULE_SOFT, TYPE, totalSize } from "./theme";
 
 Font.register({
   family: FONT,
@@ -57,74 +54,66 @@ const s = StyleSheet.create({
     backgroundColor: "#ffffff",
   },
 
-  masthead: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  masthead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   /* The real mark from the Cubixso site, not a redraw. Printed at its own
-     colour: a logo is not a themeable element, so the document's accent recolours
-     the labels around it and leaves the mark alone. */
-  logo: { width: 26, height: 26, objectFit: "contain" },
-  brandRow: { flexDirection: "row", alignItems: "center", gap: 9 },
-  wordmark: { fontSize: 13, fontWeight: 600, letterSpacing: TRACK_TIGHT },
-  brandSub: { fontSize: 7, color: FAINT, letterSpacing: 0.3, marginTop: 1 },
+     colour: a logo is not a themeable element. */
+  logo: { width: 28, height: 28, objectFit: "contain" },
+  brandRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  wordmark: { ...TYPE.brand },
+  brandSub: { ...TYPE.overline, marginTop: 2 },
+  docType: { ...TYPE.docTitle, textAlign: "right" },
+  docNumber: { ...TYPE.docNumber, textAlign: "right", marginTop: 3 },
 
-  docType: {
-    fontSize: 7.5, fontWeight: 600, letterSpacing: TRACK_EYEBROW,
-    textTransform: "uppercase", textAlign: "right",
-  },
-  docNumber: { fontSize: 22, fontWeight: 700, letterSpacing: TRACK_DISPLAY, textAlign: "right", marginTop: 1 },
-
-  rule: { borderTopWidth: 1, borderTopColor: RULE, marginVertical: 16 },
+  rule: { borderTopWidth: 1, borderTopColor: RULE, marginVertical: 18 },
   ruleSoft: { borderTopWidth: 1, borderTopColor: RULE_SOFT },
   /* Rows close themselves underneath, so the header rule is not doubled
      and the last row still has an edge below it. */
   rowRule: { borderBottomWidth: 1, borderBottomColor: RULE_SOFT },
 
-  eyebrow: {
-    fontSize: 6.5, fontWeight: 600, letterSpacing: TRACK_EYEBROW,
-    textTransform: "uppercase", color: FAINT, marginBottom: 5,
-  },
+  eyebrow: { ...TYPE.overline, marginBottom: 6 },
 
   parties: { flexDirection: "row", gap: 28 },
   party: { flex: 1 },
-  partyName: { fontSize: 10.5, fontWeight: 600, letterSpacing: TRACK_TIGHT, marginBottom: 3 },
-  partyLine: { color: MUTED, fontSize: 8.5 },
-  partyTag: { marginTop: 4, fontSize: 8, fontWeight: 500 },
+  partyName: { ...TYPE.name, marginBottom: 3 },
+  partyLine: { ...TYPE.body },
+  partyTag: { ...TYPE.bodyInk, marginTop: 4 },
 
   metaRow: { flexDirection: "row", gap: 20, marginTop: 18 },
   metaCell: { flex: 1 },
-  metaValue: { fontSize: 9, fontWeight: 500 },
+  metaValue: { ...TYPE.value },
 
-  th: {
-    fontSize: 6.5, fontWeight: 600, letterSpacing: TRACK_EYEBROW,
-    textTransform: "uppercase", color: FAINT,
-  },
-  tr: { flexDirection: "row", alignItems: "flex-start", paddingVertical: 8 },
-  cellDesc: { fontSize: 9, fontWeight: 500 },
-  cellSub: { fontSize: 7.5, color: FAINT, marginTop: 2 },
-  num: { textAlign: "right", fontSize: 8.5 },
+  th: { ...TYPE.tableHead },
+  tr: { flexDirection: "row", alignItems: "flex-start", paddingVertical: 9 },
+  cellDesc: { ...TYPE.name },
+  cellSub: { ...TYPE.body, marginTop: 2 },
+  num: { ...TYPE.figure, textAlign: "right" },
 
-  totalsWrap: { flexDirection: "row", justifyContent: "flex-end", marginTop: 14 },
-  totals: { width: "56%" },
-  totalRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 3.5 },
-  totalLabel: { color: MUTED, fontSize: 8.5 },
-  totalValue: { fontSize: 8.5, fontWeight: 500 },
+  totalsWrap: { flexDirection: "row", justifyContent: "flex-end", marginTop: 12 },
+  totals: { width: "50%" },
+  totalRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 3 },
+  totalLabel: { ...TYPE.subValue },
+  totalValue: { ...TYPE.figure },
 
+  /* The template's grand-total band: full width under an ink rule, label and
+     due date on the left, the figure large and Regular on the right. No shaded
+     box: the template separates with rules, never with filled panels. */
   grand: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    backgroundColor: PARCHMENT, paddingVertical: 11, paddingHorizontal: 13,
-    marginTop: 8, borderRadius: 5,
+    flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end",
+    borderTopWidth: 1, borderTopColor: INK, marginTop: 12, paddingTop: 10,
   },
-  grandLabel: { fontSize: 7, fontWeight: 600, letterSpacing: TRACK_EYEBROW, textTransform: "uppercase" },
-  grandValue: { fontSize: 15, fontWeight: 700, letterSpacing: TRACK_DISPLAY },
+  grandLabel: { ...TYPE.totalLabel },
+  grandSub: { ...TYPE.subValue, marginTop: 3 },
+  grandValue: { ...TYPE.total, lineHeight: 1 },
 
-  words: { marginTop: 12, fontSize: 8, color: MUTED },
-  wordsValue: { color: INK, fontWeight: 500 },
+  words: { ...TYPE.body, marginTop: 16 },
+  wordsValue: { color: INK },
 
   panels: { flexDirection: "row", gap: 28, marginTop: 20 },
   panel: { flex: 1 },
   kv: { flexDirection: "row", marginBottom: 2 },
-  kvKey: { width: "42%", color: FAINT, fontSize: 8 },
-  kvVal: { flex: 1, fontSize: 8, fontWeight: 500 },
-  body: { fontSize: 8, color: MUTED },
+  kvKey: { ...TYPE.body, width: "42%" },
+  kvVal: { ...TYPE.bodyInk, flex: 1 },
+  body: { ...TYPE.body },
 
   signOff: { flexDirection: "row", alignItems: "flex-end", gap: 28, marginTop: 22 },
   signBlock: { width: 240, alignItems: "flex-end" },
@@ -133,19 +122,15 @@ const s = StyleSheet.create({
   signRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   seal: { width: 60, height: 60, objectFit: "contain" },
   signCol: { width: 170, alignItems: "flex-end" },
-  signFor: { fontSize: 7.5, color: MUTED, textAlign: "right", marginBottom: 4 },
-  signName: { fontSize: 8.5, fontWeight: 500, textAlign: "right" },
-  signRole: { fontSize: 7, color: FAINT, textAlign: "right", marginTop: 1 },
+  signFor: { ...TYPE.body, textAlign: "right", marginBottom: 4 },
+  signName: { ...TYPE.name, textAlign: "right" },
+  signRole: { ...TYPE.caption, textAlign: "right", marginTop: 1 },
   /* Bounded on both axes to the signature line's width: a 7:1 signature at a
-     fixed height alone renders ~400pt wide and runs off the page. `contain`
-     keeps a square stamp and a wide signature both inside the same box. */
+     fixed height alone renders ~400pt wide and runs off the page. */
   signImage: { width: 170, height: 40, objectFit: "contain", objectPosition: "right", marginBottom: 2 },
   signRule: { borderTopWidth: 1, borderTopColor: RULE, width: 170, marginTop: 4, paddingTop: 4 },
 
-  footer: {
-    position: "absolute", bottom: PAGE_MARGIN - 16, left: PAGE_MARGIN,
-    fontSize: 6.8, color: FAINT,
-  },
+  footer: { ...TYPE.caption, position: "absolute", bottom: PAGE_MARGIN - 16, left: PAGE_MARGIN },
 });
 
 /** Table geometry, kept in one place so header and body can never disagree. */
@@ -191,6 +176,8 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
   const isGst = invoice.kind === "gst";
   const col = isGst ? COLS_GST : COLS_PLAIN;
   const accent = invoice.accent || "#0066cc";
+  const totalText = formatMoney(t.grandTotalMinor, c);
+  const totalSizePt = totalSize(totalText);
   const pos = formatPlaceOfSupply(effectivePlaceOfSupply(invoice));
 
   // Only worth a column when the rates actually differ; a table repeating "18%"
@@ -235,8 +222,10 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
             )}
           </View>
           <View>
+            {/* The accent lives on the small title: at 40pt the template sets the
+                total in ink, and a coloured figure that size shouts. */}
             <Text style={[s.docType, { color: accent }]}>{isGst ? "Tax Invoice" : "Invoice"}</Text>
-            <Text style={s.docNumber}>{invoice.number || "—"}</Text>
+            <Text style={s.docNumber}>No. {invoice.number || "—"}</Text>
           </View>
         </View>
 
@@ -312,7 +301,7 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
           const line = t.lines[i];
           return (
             <View key={item.id} style={[s.tr, s.rowRule]} wrap={false}>
-              <Text style={[s.num, { width: col.idx, textAlign: "left", color: FAINT }]}>
+              <Text style={[s.num, { width: col.idx, textAlign: "left", color: MUTED }]}>
                 {String(i + 1).padStart(2, "0")}
               </Text>
               <View style={{ width: descWidth, paddingRight: 8 }}>
@@ -366,13 +355,26 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
               />
             )}
 
-            <View style={[s.grand, { backgroundColor: PARCHMENT }]}>
-              <Text style={s.grandLabel}>Total due</Text>
-              <Text style={[s.grandValue, { color: accent }]}>
-                {formatMoney(t.grandTotalMinor, c)}
-              </Text>
-            </View>
           </View>
+        </View>
+
+        <View style={s.grand} wrap={false}>
+          <View>
+            <Text style={s.grandLabel}>Total due</Text>
+            {invoice.dueDate ? (
+              <Text style={s.grandSub}>Payable by {fmtDate(invoice.dueDate)}</Text>
+            ) : null}
+          </View>
+          <Text
+            style={[
+              s.grandValue,
+              // Tracking stays at the template's −3% of whatever size the
+              // figure steps down to.
+              { fontSize: totalSizePt, letterSpacing: totalSizePt * -0.03 },
+            ]}
+          >
+            {totalText}
+          </Text>
         </View>
 
         {invoice.showAmountInWords && (
@@ -484,7 +486,7 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
             number is written in statically instead, so a loose second page can
             still be matched to its invoice. */}
         <Text style={s.footer} fixed>
-          {`No. ${invoice.number || "—"} · ${
+          {`No. ${invoice.number || "—"} · All amounts in ${c.code} · ${
             isGst
               ? "This is a computer-generated tax invoice."
               : "Not a tax invoice. GST is not charged (0%)."
