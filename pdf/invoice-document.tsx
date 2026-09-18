@@ -145,8 +145,17 @@ function fmtDate(iso: string): string {
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+/**
+ * A style as produced by `StyleSheet.create`.
+ *
+ * Derived from the call rather than written out, so it tracks whatever
+ * @react-pdf accepts instead of drifting from it. `object` was too wide and
+ * would not type-check against <Text>.
+ */
+type PdfStyle = ReturnType<typeof StyleSheet.create>[string];
+
 /** Renders a textarea's contents as one Text per line. */
-function Lines({ text, style }: { text: string; style?: object }) {
+function Lines({ text, style }: { text: string; style?: PdfStyle }) {
   return (
     <>
       {text.split("\n").map((line, i) => (
