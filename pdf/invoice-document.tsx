@@ -120,7 +120,9 @@ const s = StyleSheet.create({
   closeLeft: { flex: 1 },
   signBlock: { width: 190, alignItems: "flex-end" },
   /* Beneath "Authorised Signatory", centred under the signature line. */
-  seal: { width: 58, height: 58, objectFit: "contain", alignSelf: "center", marginTop: 8 },
+  /* 86pt reads as a real rubber seal on an A4 page; at 58pt the ring text
+     was too small to read. The page has room: the close is two columns. */
+  seal: { width: 86, height: 86, objectFit: "contain", alignSelf: "center", marginTop: 8 },
   signFor: { ...TYPE.body, textAlign: "right", marginBottom: 4 },
   signName: { ...TYPE.name, textAlign: "right" },
   signRole: { ...TYPE.caption, textAlign: "right", marginTop: 1 },
