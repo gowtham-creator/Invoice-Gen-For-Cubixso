@@ -19,9 +19,17 @@ export const CUBIXSO_SELLER: Party = {
   gstin: "36AAMCC0213G1Z2",
   pan: "AAMCC0213G",
   email: "contact@cubixso.com",
-  phone: "+91 92469 01689",
+  phone: "+91 83745 63012",
   state: SELLER_STATE,
 };
+
+/**
+ * Seller phone numbers that once shipped as the default and have since been
+ * corrected. A saved draft holding one of these never had it typed in: it is a
+ * stale default, and follows the current one. Numbers the user entered
+ * themselves are left alone.
+ */
+export const RETIRED_SELLER_PHONES = ["+91 92469 01689"];
 
 /** The earlier registered address, kept as a one-click alternative. */
 export const CUBIXSO_THUB_ADDRESS =

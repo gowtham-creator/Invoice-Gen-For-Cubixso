@@ -16,7 +16,7 @@
  */
 
 import type { Invoice } from "./invoice-types";
-import { blankInvoice } from "./defaults";
+import { CUBIXSO_SELLER, RETIRED_SELLER_PHONES, blankInvoice } from "./defaults";
 
 const DRAFT_KEY = "cubixso.invoice.draft.v1";
 const SAVED_KEY = "cubixso.invoice.saved.v1";
@@ -41,11 +41,26 @@ function reconcile(stored: unknown): Invoice {
   return {
     ...base,
     ...s,
-    seller: { ...base.seller, ...(s.seller ?? {}) },
+    seller: migrateSeller({ ...base.seller, ...(s.seller ?? {}) }),
     buyer: { ...base.buyer, ...(s.buyer ?? {}) },
     bank: { ...base.bank, ...(s.bank ?? {}) },
     items: Array.isArray(s.items) && s.items.length > 0 ? s.items : base.items,
   };
+}
+
+/**
+ * Brings a stored seller up to date with defaults that have been corrected.
+ *
+ * A saved draft wins over defaults, which is right for anything the user typed
+ * and wrong for values they merely inherited: those would otherwise stay stale
+ * forever, invisibly, on every invoice. This is the lesson of the signature
+ * that never appeared: an old draft's inherited `null` kept overriding it.
+ */
+function migrateSeller(seller: Invoice["seller"]): Invoice["seller"] {
+  if (RETIRED_SELLER_PHONES.includes(seller.phone)) {
+    return { ...seller, phone: CUBIXSO_SELLER.phone };
+  }
+  return seller;
 }
 
 export function loadDraft(): Invoice | null {
