@@ -108,27 +108,26 @@ const s = StyleSheet.create({
   words: { ...TYPE.body, marginTop: 16 },
   wordsValue: { color: INK },
 
-  panels: { flexDirection: "row", gap: 28, marginTop: 20 },
-  panel: { flex: 1 },
+  notes: { marginTop: 20 },
   kv: { flexDirection: "row", marginBottom: 2 },
-  kvKey: { ...TYPE.body, width: "42%" },
+  /* A fixed key width, not a percentage: the left column is narrower now, and
+     42% of it would squeeze the payee name onto two lines. */
+  kvKey: { ...TYPE.body, width: 56 },
   kvVal: { ...TYPE.bodyInk, flex: 1 },
   body: { ...TYPE.body },
 
-  signOff: { flexDirection: "row", alignItems: "flex-end", gap: 28, marginTop: 22 },
-  signBlock: { width: 240, alignItems: "flex-end" },
-  /* Seal to the left of the signature, centred on it, as on a stamped
-     and signed Indian invoice. */
-  signRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  seal: { width: 60, height: 60, objectFit: "contain" },
-  signCol: { width: 170, alignItems: "flex-end" },
+  close: { flexDirection: "row", alignItems: "flex-start", gap: 28, marginTop: 20 },
+  closeLeft: { flex: 1 },
+  signBlock: { width: 190, alignItems: "flex-end" },
+  /* Beneath "Authorised Signatory", centred under the signature line. */
+  seal: { width: 58, height: 58, objectFit: "contain", alignSelf: "center", marginTop: 8 },
   signFor: { ...TYPE.body, textAlign: "right", marginBottom: 4 },
   signName: { ...TYPE.name, textAlign: "right" },
   signRole: { ...TYPE.caption, textAlign: "right", marginTop: 1 },
   /* Bounded on both axes to the signature line's width: a 7:1 signature at a
      fixed height alone renders ~400pt wide and runs off the page. */
-  signImage: { width: 170, height: 40, objectFit: "contain", objectPosition: "right", marginBottom: 2 },
-  signRule: { borderTopWidth: 1, borderTopColor: RULE, width: 170, marginTop: 4, paddingTop: 4 },
+  signImage: { width: 190, height: 40, objectFit: "contain", objectPosition: "right", marginBottom: 2 },
+  signRule: { borderTopWidth: 1, borderTopColor: RULE, width: 190, marginTop: 4, paddingTop: 4 },
 
   footer: { ...TYPE.caption, position: "absolute", bottom: PAGE_MARGIN - 16, left: PAGE_MARGIN },
 });
@@ -415,65 +414,59 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
           </View>
         )}
 
-        {/* Notes and payment */}
-        <View style={s.panels} wrap={false}>
-          {invoice.notes.trim() !== "" && (
-            <View style={s.panel}>
-              <Eyebrow>Notes</Eyebrow>
-              <Lines text={invoice.notes} style={s.body} />
-            </View>
-          )}
-          {invoice.showBank && (
-            <View style={s.panel}>
-              <Eyebrow>Payment details</Eyebrow>
-              <KV k="Payee" v={invoice.bank.payeeName} />
-              <KV k="Account" v={invoice.bank.accountNumber} />
-              <KV k="Type" v={invoice.bank.accountType} />
-              <KV k="Bank" v={invoice.bank.bankName} />
-              <KV k="Branch" v={invoice.bank.branch} />
-              <KV k="IFSC" v={invoice.bank.ifsc} />
-              <KV k="SWIFT" v={invoice.bank.swift} />
-              <KV k="UPI" v={invoice.bank.upi} />
-            </View>
-          )}
-        </View>
+        {invoice.notes.trim() !== "" && (
+          <View style={s.notes} wrap={false}>
+            <Eyebrow>Notes</Eyebrow>
+            <Lines text={invoice.notes} style={s.body} />
+          </View>
+        )}
 
-        {/* Sign-off: terms and signature share one row.
-            Stacked, the pair ran about 10pt taller than what a one-line invoice
-            leaves on page 1, and because it is kept together it jumped whole to
-            page 2 and left a quarter of the first page blank. Side by side it
-            is roughly half the height. */}
-        <View style={s.signOff} wrap={false}>
-          <View style={{ flex: 1 }}>
+        {/* Close: payment details and terms stacked on the left, the signature
+            column on the right with the seal beneath "Authorised Signatory".
+            Stacking the seal under the signature adds ~60pt; laying the two
+            columns side by side is what keeps a one-line invoice on one page,
+            and stops payment details sprawling across the full width. */}
+        <View style={s.close} wrap={false}>
+          <View style={s.closeLeft}>
+            {invoice.showBank && (
+              <View>
+                <Eyebrow>Payment details</Eyebrow>
+                <KV k="Payee" v={invoice.bank.payeeName} />
+                <KV k="Account" v={invoice.bank.accountNumber} />
+                <KV k="Type" v={invoice.bank.accountType} />
+                <KV k="Bank" v={invoice.bank.bankName} />
+                <KV k="Branch" v={invoice.bank.branch} />
+                <KV k="IFSC" v={invoice.bank.ifsc} />
+                <KV k="SWIFT" v={invoice.bank.swift} />
+                <KV k="UPI" v={invoice.bank.upi} />
+              </View>
+            )}
             {invoice.terms.trim() !== "" && (
-              <>
+              <View style={invoice.showBank ? { marginTop: 16 } : undefined}>
                 <Eyebrow>Terms</Eyebrow>
                 <Lines text={invoice.terms} style={s.body} />
-              </>
+              </View>
             )}
           </View>
 
           {invoice.showSignature && (
             <View style={s.signBlock}>
               {/* The conventional Indian sign-off: the company the signatory
-                  acts for above the signature, the capacity below it. */}
+                  acts for above the signature, the capacity below it, and the
+                  company seal beneath that. */}
               <Text style={s.signFor}>For {invoice.seller.name}</Text>
-              <View style={s.signRow}>
-                {invoice.showStamp && (
-                  /* eslint-disable-next-line jsx-a11y/alt-text */
-                  <Image src={BUILTIN_SEAL} style={s.seal} />
-                )}
-                <View style={s.signCol}>
-                  {/* Always an image: signatureSrc falls back to the built-in
-                      signature, so no saved draft can leave this line blank. */}
-                  {/* eslint-disable-next-line jsx-a11y/alt-text */}
-                  <Image src={signatureSrc(invoice)} style={s.signImage} />
-                  <View style={s.signRule}>
-                    <Text style={s.signName}>{invoice.signatoryName || invoice.seller.name}</Text>
-                    <Text style={s.signRole}>Authorised Signatory</Text>
-                  </View>
-                </View>
+              {/* Always an image: signatureSrc falls back to the built-in
+                  signature, so no saved draft can leave this line blank. */}
+              {/* eslint-disable-next-line jsx-a11y/alt-text */}
+              <Image src={signatureSrc(invoice)} style={s.signImage} />
+              <View style={s.signRule}>
+                <Text style={s.signName}>{invoice.signatoryName || invoice.seller.name}</Text>
+                <Text style={s.signRole}>Authorised Signatory</Text>
               </View>
+              {invoice.showStamp && (
+                /* eslint-disable-next-line jsx-a11y/alt-text */
+                <Image src={BUILTIN_SEAL} style={s.seal} />
+              )}
             </View>
           )}
         </View>
