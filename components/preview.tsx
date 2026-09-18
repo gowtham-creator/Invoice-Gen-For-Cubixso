@@ -14,12 +14,11 @@
  * receives.
  */
 
-import { useEffect, useState } from "react";
-import { usePDF } from "@react-pdf/renderer";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Invoice } from "@/lib/invoice-types";
 import { isCustomSignature } from "@/lib/defaults";
 import { redrawImage } from "@/lib/export/browser";
-import { InvoiceDocument } from "@/pdf/invoice-document";
+import { renderInvoicePdf } from "@/pdf/render";
 import { PALETTES } from "@/pdf/theme";
 import { useTheme } from "./theme";
 
@@ -60,23 +59,42 @@ export function Preview({ invoice }: { invoice: Invoice }) {
   const variant = resolved;
   const settled = useDebounced(invoice, DEBOUNCE_MS);
   const darkSignature = useDarkSignature(settled, variant === "dark");
-  const doc = <InvoiceDocument invoice={settled} variant={variant} darkSignature={darkSignature} />;
-  const [instance, update] = usePDF({ document: doc });
+  // What the sheet should show; a render answers for exactly this key.
+  const key = useMemo(() => ({ settled, variant, darkSignature }), [settled, variant, darkSignature]);
+  const [shown, setShown] = useState<{ key: object; url: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const current = useRef<string | null>(null);
 
   useEffect(() => {
-    update(<InvoiceDocument invoice={settled} variant={variant} darkSignature={darkSignature} />);
-    // `update` is recreated each render by usePDF; depending on it would loop.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settled, variant, darkSignature]);
+    let live = true;
+    // Rendered in a Web Worker (see pdf/render.ts), so typing never waits on it.
+    renderInvoicePdf(key.settled, key.variant, key.darkSignature)
+      .then((blob) => {
+        // A newer edit superseded this render: drop it rather than show stale work.
+        if (!live) return;
+        const url = URL.createObjectURL(blob);
+        const previous = current.current;
+        current.current = url;
+        setShown({ key, url });
+        setError(null);
+        // Every render is a ~330 KB file. Free the last one once the new one has
+        // had time to load, or memory grows for as long as the invoice is edited.
+        if (previous) setTimeout(() => URL.revokeObjectURL(previous), 3000);
+      })
+      .catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
+    return () => {
+      live = false;
+    };
+  }, [key]);
 
-  // Hold the last good URL so the sheet never blanks between renders. Kept in
-  // state and updated during render, React's pattern for remembering a value
-  // from a previous render.
-  const [lastUrl, setLastUrl] = useState<string | null>(null);
-  if (instance.url && instance.url !== lastUrl) setLastUrl(instance.url);
-  const shown = instance.url ?? lastUrl;
+  useEffect(
+    () => () => {
+      if (current.current) URL.revokeObjectURL(current.current);
+    },
+    [],
+  );
 
-  const busy = instance.loading || settled !== invoice;
+  const busy = !shown || shown.key !== key || settled !== invoice;
   const paper = PALETTES[variant].paper;
 
   return (
@@ -103,12 +121,12 @@ export function Preview({ invoice }: { invoice: Invoice }) {
                 : "0 1px 2px rgba(16,24,40,0.06), 0 12px 32px -8px rgba(16,24,40,0.18)",
           }}
         >
-          {instance.error ? (
+          {error && !shown ? (
             <div className="flex h-full items-center justify-center p-10 text-center text-[13px] text-ink-2">
-              The invoice could not be drawn: {String(instance.error)}
+              The invoice could not be drawn: {error}
             </div>
           ) : shown ? (
-            <iframe title="Invoice" src={`${shown}#toolbar=0&navpanes=0&view=Fit`} className="size-full" />
+            <iframe title="Invoice" src={`${shown.url}#toolbar=0&navpanes=0&view=Fit`} className="size-full" />
           ) : (
             <SheetSkeleton dark={variant === "dark"} />
           )}
