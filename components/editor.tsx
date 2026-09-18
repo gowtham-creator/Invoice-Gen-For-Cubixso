@@ -11,13 +11,13 @@
  */
 
 import { useRef } from "react";
-import { Upload, RotateCcw, Stamp, PenLine } from "lucide-react";
+import { Upload, RotateCcw, PenLine } from "lucide-react";
 import type { BankDetails, Invoice, Party } from "@/lib/invoice-types";
 import { CURRENCIES, currencyOf } from "@/lib/currency";
 import { computeTotals, effectivePlaceOfSupply } from "@/lib/invoice-math";
 import {
-  BANK_PROFILES, CUBIXSO_SELLER, CUBIXSO_THUB_ADDRESS, INDIAN_STATES,
-  formatPlaceOfSupply,
+  BANK_PROFILES, BUILTIN_SEAL, CUBIXSO_SELLER, CUBIXSO_THUB_ADDRESS, INDIAN_STATES,
+  formatPlaceOfSupply, signatureSrc,
 } from "@/lib/defaults";
 import { Button, Field, Label, Row, Section, Segmented, Select, TextArea, Toggle } from "./controls";
 import { LineItemsEditor } from "./line-items";
@@ -41,6 +41,8 @@ export function Editor({
   const c = currencyOf(invoice.currencyCode);
   const totals = computeTotals(invoice);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Only an upload counts as a replacement; see signatureSrc.
+  const customSignature = invoice.signatureImage?.startsWith("data:") ?? false;
 
   const setParty = (which: "seller" | "buyer", patch: Partial<Party>) =>
     set({ [which]: { ...invoice[which], ...patch } } as Partial<Invoice>);
@@ -274,7 +276,23 @@ export function Editor({
           <Toggle label="Show signature block" checked={invoice.showSignature} onChange={(showSignature) => set({ showSignature })} />
           {invoice.showSignature && (
             <>
+              <Toggle label="Show company seal" checked={invoice.showStamp} onChange={(showStamp) => set({ showStamp })} />
               <Field label="Signatory" value={invoice.signatoryName} onChange={(signatoryName) => set({ signatoryName })} />
+
+              {/* Exactly what prints: the same resolver the PDF uses. */}
+              <div className="flex items-center gap-3 rounded-md border border-hairline bg-paper p-3">
+                {invoice.showStamp ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={BUILTIN_SEAL} alt="Company seal" className="h-14 w-14 shrink-0 object-contain" />
+                ) : null}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={signatureSrc(invoice)}
+                  alt="Signature"
+                  className="h-10 min-w-0 flex-1 object-contain object-right"
+                />
+              </div>
+
               <div className="flex flex-wrap items-center gap-1.5">
                 <input
                   ref={fileRef}
@@ -288,28 +306,15 @@ export function Editor({
                 />
                 <Button onClick={() => fileRef.current?.click()}>
                   <Upload size={12} />
-                  Upload image
+                  Use a different signature
                 </Button>
-                <Button onClick={() => set({ signatureImage: "/signature.png" })}>
-                  <PenLine size={12} />
-                  My signature
-                </Button>
-                <Button onClick={() => set({ signatureImage: "/cubixso-stamp.png" })}>
-                  <Stamp size={12} />
-                  Cubixso stamp
-                </Button>
-                {invoice.signatureImage ? (
+                {customSignature ? (
                   <Button variant="quiet" onClick={() => set({ signatureImage: null })}>
-                    Remove
+                    <PenLine size={12} />
+                    Back to my signature
                   </Button>
                 ) : null}
               </div>
-              {invoice.signatureImage ? (
-                <div className="rounded-md border border-hairline bg-paper p-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={invoice.signatureImage} alt="Signature preview" className="mx-auto h-14 object-contain" />
-                </div>
-              ) : null}
             </>
           )}
         </div>

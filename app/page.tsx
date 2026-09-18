@@ -93,6 +93,7 @@ export default function Page() {
       accent: invoice.accent,
       signatoryName: invoice.signatoryName,
       signatureImage: invoice.signatureImage,
+      showStamp: invoice.showStamp,
     });
     setPane("edit");
   };

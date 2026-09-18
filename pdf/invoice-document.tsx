@@ -25,7 +25,7 @@ import type { Invoice } from "../lib/invoice-types";
 import { computeTotals, effectivePlaceOfSupply } from "../lib/invoice-math";
 import { currencyOf, formatMoney } from "../lib/currency";
 import { amountInWords } from "../lib/amount-in-words";
-import { formatPlaceOfSupply } from "../lib/defaults";
+import { BUILTIN_SEAL, formatPlaceOfSupply, signatureSrc } from "../lib/defaults";
 import {
   FAINT, FONT, INK, MUTED, PAGE_MARGIN, PARCHMENT, RULE, RULE_SOFT,
   TRACK_DISPLAY, TRACK_EYEBROW, TRACK_TIGHT,
@@ -127,7 +127,12 @@ const s = StyleSheet.create({
   body: { fontSize: 8, color: MUTED },
 
   signOff: { flexDirection: "row", alignItems: "flex-end", gap: 28, marginTop: 22 },
-  signBlock: { width: 190, alignItems: "flex-end" },
+  signBlock: { width: 240, alignItems: "flex-end" },
+  /* Seal to the left of the signature, centred on it, as on a stamped
+     and signed Indian invoice. */
+  signRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  seal: { width: 60, height: 60, objectFit: "contain" },
+  signCol: { width: 170, alignItems: "flex-end" },
   signFor: { fontSize: 7.5, color: MUTED, textAlign: "right", marginBottom: 4 },
   signName: { fontSize: 8.5, fontWeight: 500, textAlign: "right" },
   signRole: { fontSize: 7, color: FAINT, textAlign: "right", marginTop: 1 },
@@ -451,15 +456,21 @@ export function InvoiceDocument({ invoice }: { invoice: Invoice }) {
               {/* The conventional Indian sign-off: the company the signatory
                   acts for above the signature, the capacity below it. */}
               <Text style={s.signFor}>For {invoice.seller.name}</Text>
-              {invoice.signatureImage ? (
-                /* eslint-disable-next-line jsx-a11y/alt-text */
-                <Image src={invoice.signatureImage} style={s.signImage} />
-              ) : (
-                <View style={{ height: 40 }} />
-              )}
-              <View style={s.signRule}>
-                <Text style={s.signName}>{invoice.signatoryName || invoice.seller.name}</Text>
-                <Text style={s.signRole}>Authorised Signatory</Text>
+              <View style={s.signRow}>
+                {invoice.showStamp && (
+                  /* eslint-disable-next-line jsx-a11y/alt-text */
+                  <Image src={BUILTIN_SEAL} style={s.seal} />
+                )}
+                <View style={s.signCol}>
+                  {/* Always an image: signatureSrc falls back to the built-in
+                      signature, so no saved draft can leave this line blank. */}
+                  {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                  <Image src={signatureSrc(invoice)} style={s.signImage} />
+                  <View style={s.signRule}>
+                    <Text style={s.signName}>{invoice.signatoryName || invoice.seller.name}</Text>
+                    <Text style={s.signRole}>Authorised Signatory</Text>
+                  </View>
+                </View>
               </View>
             </View>
           )}

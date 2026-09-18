@@ -52,6 +52,29 @@ export const BANK_PROFILES: BankDetails[] = [
   },
 ];
 
+/**
+ * Nayini Gowtham Reddy's signature, from the Board Resolution: a transparent
+ * PNG, so it sits on the paper rather than in a white box.
+ */
+export const BUILTIN_SIGNATURE = "/signature.png";
+
+/** The company seal, trimmed to its ink so it prints at a readable size. */
+export const BUILTIN_SEAL = "/seal.png";
+
+/**
+ * The signature to print.
+ *
+ * Only an uploaded image (a data URL) replaces the built-in signature. Anything
+ * else falls back to it, including `null` and the file paths older drafts
+ * stored here. Resolving at render time, rather than seeding a default into
+ * the draft, is what makes the signature permanent: a draft saved before it
+ * existed held `null`, and that saved value was overriding the new default.
+ */
+export function signatureSrc(inv: Pick<Invoice, "signatureImage">): string {
+  const v = inv.signatureImage;
+  return v && v.startsWith("data:") ? v : BUILTIN_SIGNATURE;
+}
+
 export const GST_RATES = [0, 0.25, 3, 5, 12, 18, 28];
 
 /**
@@ -149,9 +172,8 @@ export function blankInvoice(kind: Invoice["kind"] = "gst"): Invoice {
     showSignature: true,
     showAmountInWords: true,
     signatoryName: "Nayini Gowtham Reddy",
-    // Nayini Gowtham Reddy's signature, taken from the Board Resolution. A
-    // transparent PNG, so it sits on the paper rather than in a white box.
-    signatureImage: "/signature.png",
+    showStamp: true,
+    signatureImage: null,
     accent: "#0066cc",
   };
 }
