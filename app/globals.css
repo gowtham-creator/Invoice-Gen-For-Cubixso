@@ -1,26 +1,123 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/**
+ * The editor is a drafting table.
+ *
+ * The scene this is designed for: a founder at his desk late at night, after
+ * a deal closes, wanting the invoice out before he forgets. That forces the
+ * theme rather than taste doing it — the invoice is a white sheet of paper, and
+ * the only way to make a white sheet read as paper on a screen is to make it
+ * the brightest thing there. So the chrome goes dark and the page is lit.
+ *
+ * Every neutral is tinted toward the brand blue (hue 258) at very low chroma.
+ * Pure grey next to a blue accent reads as dead, and pure black or white reads
+ * as a default nobody chose.
+ */
+
+@theme {
+  /* Chrome, darkest to lightest. */
+  --color-void: oklch(0.16 0.008 258);
+  --color-panel: oklch(0.203 0.009 258);
+  --color-raised: oklch(0.245 0.010 258);
+  --color-input: oklch(0.228 0.010 258);
+  --color-hairline: oklch(0.295 0.012 258);
+  --color-hairline-bright: oklch(0.38 0.015 258);
+
+  /* Type on chrome. */
+  --color-ink: oklch(0.965 0.003 258);
+  --color-muted: oklch(0.715 0.009 258);
+  --color-faint: oklch(0.565 0.011 258);
+
+  /* The one interactive colour. Action Blue, from the Cubixso design system. */
+  --color-action: oklch(0.545 0.178 254);
+  --color-action-bright: oklch(0.645 0.175 254);
+  --color-action-dim: oklch(0.40 0.110 254);
+
+  /* Sparingly, for destructive affordances only. */
+  --color-alert: oklch(0.62 0.19 25);
+
+  /* The sheet. Faintly warm-neutral so it reads as stock, not as #fff. */
+  --color-paper: oklch(0.995 0.001 258);
+
+  --font-sans: "InterVar", ui-sans-serif, system-ui, sans-serif;
+
+  /* Exponential ease-out. No bounce, no elastic — this is a billing tool. */
+  --ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-void);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "ss03", "cv05", "tnum" 0;
+}
+
+/* Tabular figures wherever numbers are compared down a column. Proportional
+   digits make a totals ladder look ragged and slightly wrong. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* One focus treatment, everywhere. Visible on dark chrome without the default
+   ring's halo, which at this surface lightness reads as a glow. */
+:focus-visible {
+  outline: 2px solid var(--color-action-bright);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+::selection {
+  background: var(--color-action-dim);
+  color: var(--color-ink);
+}
+
+/* The scrollbar is chrome too. Left at the OS default it punches a bright
+   channel down the side of a dark panel. */
+.scroll-slim {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-hairline-bright) transparent;
+}
+.scroll-slim::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+.scroll-slim::-webkit-scrollbar-thumb {
+  background: var(--color-hairline-bright);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.scroll-slim::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Native date inputs render their picker glyph near-black, which disappears
+   against the input surface. */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.75);
+  cursor: pointer;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
