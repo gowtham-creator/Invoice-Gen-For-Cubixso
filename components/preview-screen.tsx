@@ -16,6 +16,7 @@ import type { ExportFormat } from "@/lib/export/shared";
 import { lightPdfUrl } from "@/lib/export/browser";
 import { ExportMenu } from "./export-menu";
 import { ThemeToggle } from "./theme";
+import { PdfSheet } from "./pdf-sheet";
 
 export function PreviewScreen({
   invoice,
@@ -59,7 +60,7 @@ export function PreviewScreen({
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium text-ink-2 transition-colors duration-150 hover:bg-well hover:text-ink"
+          className="inline-flex h-8 pointer-coarse:h-10 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium text-ink-2 transition-colors duration-150 hover:bg-well hover:text-ink"
         >
           <ArrowLeft size={15} />
           Back
@@ -87,7 +88,7 @@ export function PreviewScreen({
               The invoice could not be drawn: {error}
             </div>
           ) : url ? (
-            <iframe title="Invoice preview" src={`${url}#toolbar=0&navpanes=0&view=Fit`} className="size-full" />
+            <PdfSheet url={url} title="Invoice preview" />
           ) : (
             <div className="flex h-full items-center justify-center">
               <Loader2 size={20} className="animate-spin text-[#9aa0a8]" />

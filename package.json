@@ -12,11 +12,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@netlify/identity": "^2.0.0",
     "@react-pdf/renderer": "^4.9.0",
     "docx": "^9.7.1",
     "lucide-react": "^1.46.0",
     "motion": "^13.3.0",
     "next": "16.3.5",
+    "pdfjs-dist": "^6.3.289",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },

@@ -43,7 +43,7 @@ export function ExportMenu({
   };
 
   const base =
-    "inline-flex h-8 items-center gap-1.5 bg-accent text-[13px] font-medium text-white transition-[background-color,transform] duration-150 hover:bg-accent-strong active:translate-y-px disabled:cursor-wait disabled:bg-accent/60";
+    "inline-flex h-8 pointer-coarse:h-10 items-center gap-1.5 bg-accent text-[13px] font-medium text-white transition-[background-color,transform] duration-150 hover:bg-accent-strong active:translate-y-px disabled:cursor-wait disabled:bg-accent/60";
 
   return (
     <div className="flex shadow-[0_1px_2px_rgba(16,24,40,0.15)] rounded-md">

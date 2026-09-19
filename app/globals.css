@@ -133,3 +133,18 @@ input[type="number"]::-webkit-inner-spin-button {
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * Touch screens: iPad, Android tablets, phones. iOS Safari zooms the whole
+ * page into any field whose text is under 16px the moment it is tapped, and
+ * the editor's fields are 13px. Unlayered, so it outranks the text-[13px]
+ * utilities without touching every field. Control heights grow to finger size
+ * through the pointer-coarse: variants in the components.
+ */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
