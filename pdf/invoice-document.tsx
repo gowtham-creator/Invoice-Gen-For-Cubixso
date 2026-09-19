@@ -26,6 +26,7 @@ import { computeTotals, effectivePlaceOfSupply } from "../lib/invoice-math";
 import { currencyOf, formatMoney } from "../lib/currency";
 import { amountInWords } from "../lib/amount-in-words";
 import { formatPlaceOfSupply, isCustomSignature } from "../lib/defaults";
+import { copyrightLine } from "../lib/export/shared";
 import { FONT, PAGE_MARGIN, PALETTES, liftForDark, totalSize, typeFor, type Palette, type Variant } from "./theme";
 
 Font.register({
@@ -47,6 +48,9 @@ Font.registerHyphenationCallback((word) => [word]);
  * switching the theme swaps a finished stylesheet rather than rebuilding one on
  * every keystroke.
  */
+/** The copyright line sits this far above the page's bottom edge. */
+const FOOT = PAGE_MARGIN - 16;
+
 function buildStyles(p: Palette) {
   const TYPE = typeFor(p);
   return StyleSheet.create({
@@ -55,7 +59,8 @@ function buildStyles(p: Palette) {
     fontSize: 8.5,
     color: p.ink,
     paddingTop: PAGE_MARGIN,
-    paddingBottom: PAGE_MARGIN + 14,
+    /* Clears the footer: a hairline, the disclaimer, and the copyright. */
+    paddingBottom: FOOT + 38,
     paddingHorizontal: PAGE_MARGIN,
     lineHeight: 1.45,
     backgroundColor: p.paper,
@@ -138,7 +143,14 @@ function buildStyles(p: Palette) {
   signImage: { width: 190, height: 40, objectFit: "contain", objectPosition: "right", marginBottom: 2 },
   signRule: { borderTopWidth: 1, borderTopColor: p.rule, width: 190, marginTop: 4, paddingTop: 4 },
 
-  footer: { ...TYPE.caption, position: "absolute", bottom: PAGE_MARGIN - 16, left: PAGE_MARGIN },
+  /* The footer is separate absolutely placed pieces rather than one View of
+     rows: a fixed flex View holding Texts never rendered (see the footer). */
+  footerRule: { position: "absolute", left: PAGE_MARGIN, right: PAGE_MARGIN, bottom: FOOT + 29, borderTopWidth: 0.75, borderTopColor: p.rule },
+  footer: { ...TYPE.caption, position: "absolute", bottom: FOOT + 13, left: PAGE_MARGIN },
+  /* The real mark at cap-height scale, centred on the copyright line. */
+  badge: { position: "absolute", width: 9, height: 9, bottom: FOOT + 2.5, left: PAGE_MARGIN, objectFit: "contain" },
+  copyright: { ...TYPE.caption, position: "absolute", bottom: FOOT, left: PAGE_MARGIN },
+  copyrightBesideBadge: { left: PAGE_MARGIN + 13 },
   });
 }
 
@@ -514,12 +526,20 @@ export function InvoiceDocument({
             `render` Text would not draw in any position tried. The invoice
             number is written in statically instead, so a loose second page can
             still be matched to its invoice. */}
+        <View style={s.footerRule} fixed />
         <Text style={s.footer} fixed>
           {`No. ${invoice.number || "—"} · All amounts in ${c.code} · ${
             isGst
               ? "This is a computer-generated tax invoice."
               : "Not a tax invoice. GST is not charged (0%)."
           }`}
+        </Text>
+        {invoice.showLogo && (
+          /* eslint-disable-next-line jsx-a11y/alt-text */
+          <Image src={p.logo} style={s.badge} fixed />
+        )}
+        <Text style={invoice.showLogo ? [s.copyright, s.copyrightBesideBadge] : s.copyright} fixed>
+          {copyrightLine(invoice)}
         </Text>
       </Page>
     </Document>

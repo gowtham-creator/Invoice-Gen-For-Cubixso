@@ -15,7 +15,7 @@ import { Packer } from "docx";
 import { blankInvoice, emptyItem } from "../defaults.ts";
 import { invoiceToHtml } from "./html.ts";
 import { buildInvoiceDocx, type DocxImage } from "./docx.ts";
-import { exportFileName } from "./shared.ts";
+import { copyrightLine, exportFileName } from "./shared.ts";
 import type { Invoice } from "../invoice-types.ts";
 
 function coltec(over: Partial<Invoice> = {}): Invoice {
@@ -79,7 +79,9 @@ test("the Word export carries the same figures, the signature block, and Inter",
     assert.ok(text.includes(want), `document contains ${want}`);
   }
   const footer = Object.keys(zip.files).find((f) => /^word\/footer\d*\.xml$/.test(f))!;
-  assert.match(await zip.file(footer)!.async("string"), /computer-generated tax invoice/);
+  const footerXml = await zip.file(footer)!.async("string");
+  assert.match(footerXml, /computer-generated tax invoice/);
+  assert.match(footerXml, /All rights reserved\./);
   // JSZip lists folders as entries too; count only the files inside them.
   const files = Object.keys(zip.files).filter((f) => !f.endsWith("/"));
   const fontParts = files.filter((f) => f.startsWith("word/fonts/"));
@@ -91,4 +93,14 @@ test("the Word export carries the same figures, the signature block, and Inter",
 test("export file names say what the file is", () => {
   assert.equal(exportFileName(coltec(), "pdf"), "Tax-Invoice-003-Coltec-India-Private-Limited.pdf");
   assert.equal(exportFileName(coltec({ kind: "non-gst" }), "docx"), "Invoice-003-Coltec-India-Private-Limited.docx");
+});
+
+test("every footer carries a copyright dated to the invoice, not to today", () => {
+  const inv = coltec({ issueDate: "2025-03-14" });
+  assert.equal(copyrightLine(inv), "© 2025 CUBIXSO Solutions Private Limited. All rights reserved.");
+  const html = invoiceToHtml(inv, htmlAssets);
+  assert.ok(html.includes("© 2025 CUBIXSO Solutions Private Limited. All rights reserved."));
+  const blankSeller = coltec({ issueDate: "2026-01-02" });
+  blankSeller.seller = { ...blankSeller.seller, name: "  " };
+  assert.equal(copyrightLine(blankSeller), "© 2026 CUBIXSO Solutions Private Limited. All rights reserved.");
 });

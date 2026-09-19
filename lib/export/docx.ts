@@ -390,10 +390,21 @@ export function buildInvoiceDocx(invoice: Invoice, assets: ExportAssets<DocxImag
         properties: {
           page: {
             size: { width: PAGE_W, height: PAGE_H },
-            margin: { top: MARGIN, bottom: MARGIN + 14 * TW, left: MARGIN, right: MARGIN, footer: 24 * TW },
+            margin: { top: MARGIN, bottom: MARGIN + 26 * TW, left: MARGIN, right: MARGIN, footer: 24 * TW },
           },
         },
-        footers: { default: new Footer({ children: [para([run(d.footer, { size: 8, color: MUTED })])] }) },
+        footers: {
+          default: new Footer({
+            children: [
+              new Paragraph({
+                children: [run(d.footer, { size: 8, color: MUTED })],
+                border: { top: line(RULE, 6) },
+                spacing: { line: 276, after: 2 * TW },
+              }),
+              para([...(inv.showLogo ? [fit(assets.logo, px(9), px(9)), run("  ")] : []), run(d.copyright, { size: 8, color: MUTED })]),
+            ],
+          }),
+        },
         children: body,
       },
     ],

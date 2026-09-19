@@ -12,6 +12,14 @@ import { formatPlaceOfSupply } from "../defaults";
 
 export type ExportFormat = "pdf" | "docx" | "html";
 
+/** The copyright line in every footer. The year is the invoice's own, not
+    today's, so a reprinted old invoice still reads as it did when issued. */
+export function copyrightLine(invoice: Invoice): string {
+  const year = /^\d{4}/.exec(invoice.issueDate)?.[0] ?? String(new Date().getFullYear());
+  const owner = invoice.seller.name.trim() || "CUBIXSO Solutions Private Limited";
+  return `© ${year} ${owner}. All rights reserved.`;
+}
+
 /** Artwork for the light document: logo, signature and seal. */
 export interface ExportAssets<T> {
   logo: T;
@@ -113,6 +121,7 @@ export function describe(invoice: Invoice) {
     footer: `No. ${invoice.number || "—"} · All amounts in ${c.code} · ${
       isGst ? "This is a computer-generated tax invoice." : "Not a tax invoice. GST is not charged (0%)."
     }`,
+    copyright: copyrightLine(invoice),
     buckets: isGst && t.buckets.length > 1 ? t.buckets : [],
   };
 }

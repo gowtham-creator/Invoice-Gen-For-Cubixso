@@ -136,7 +136,7 @@ export function invoiceToHtml(invoice: Invoice, assets: ExportAssets<string>): s
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { background: #eef0f3; }
   body { font-family: Inter, -apple-system, "Segoe UI", system-ui, sans-serif; color: #0a0a0a; font-size: 8.5pt; line-height: 1.45; font-variant-numeric: tabular-nums; }
-  .page { position: relative; width: 210mm; min-height: 297mm; margin: 32px auto; padding: 40pt 40pt 64pt; background: #fff;
+  .page { position: relative; width: 210mm; min-height: 297mm; margin: 32px auto; padding: 40pt 40pt 72pt; background: #fff;
           box-shadow: 0 1px 2px rgba(16,24,40,.06), 0 12px 32px -8px rgba(16,24,40,.18); }
   @media print { html { background: #fff; } .page { margin: 0; box-shadow: none; } }
   @media (max-width: 820px) { .page { width: auto; min-height: 0; margin: 0; } }
@@ -183,7 +183,9 @@ export function invoiceToHtml(invoice: Invoice, assets: ExportAssets<string>): s
   .sign-rule { border-top: 1px solid #e3e3e3; margin-top: 4pt; padding-top: 4pt; }
   .sign-rule .name { margin: 0; }
   .seal { display: block; width: 86pt; height: 86pt; object-fit: contain; margin: 8pt auto 0; }
-  .footer { position: absolute; left: 40pt; bottom: 24pt; font-size: 8pt; color: #494949; }
+  .footer { position: absolute; left: 40pt; right: 40pt; bottom: 24pt; font-size: 8pt; color: #494949; border-top: .75pt solid #e3e3e3; padding-top: 5pt; }
+  .copyright { display: flex; align-items: center; gap: 4pt; margin-top: 2pt; }
+  .copyright img { width: 9pt; height: 9pt; object-fit: contain; }
 </style>
 </head>
 <body>
@@ -236,7 +238,10 @@ export function invoiceToHtml(invoice: Invoice, assets: ExportAssets<string>): s
       ${signature}
     </section>
 
-    <p class="footer">${escapeHtml(d.footer)}</p>
+    <footer class="footer">
+      <p>${escapeHtml(d.footer)}</p>
+      <p class="copyright">${inv.showLogo ? `<img src="${escapeHtml(assets.logo)}" alt="">` : ""}${escapeHtml(d.copyright)}</p>
+    </footer>
   </main>
 </body>
 </html>
