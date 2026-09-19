@@ -21,6 +21,7 @@
 import * as React from "react"
 import { ChevronLeft, LoaderCircle } from "lucide-react"
 import { motion } from "motion/react"
+import { GradientBars } from "@/components/ui/gradient-bars-background"
 
 export type AuthMode = "sign-in" | "set-password" | "reset-password"
 
@@ -70,11 +71,13 @@ const AuthForm: React.FC<AuthFormProps> = (props) => {
         transition={{ duration: 1.25, ease: "easeInOut" }}
         className="relative z-10 mx-auto w-full max-w-xl p-4"
       >
-        <Logo />
-        <Header mode={props.mode} />
-        <Messages error={props.error} notice={props.notice} />
-        <LoginForm {...props} />
-        <Footnote />
+        <div className="rounded-2xl border border-zinc-200/80 bg-white/75 p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_24px_60px_-20px_rgba(16,24,40,0.28)] backdrop-blur-xl sm:p-8 dark:border-white/10 dark:bg-zinc-900/55 dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset,0_28px_70px_-24px_rgba(0,0,0,0.85)]">
+          <Logo />
+          <Header mode={props.mode} />
+          <Messages error={props.error} notice={props.notice} />
+          <LoginForm {...props} />
+          <Footnote />
+        </div>
       </motion.div>
       <BackgroundDecoration />
     </div>
@@ -305,16 +308,44 @@ const Footnote: React.FC = () => (
   </p>
 )
 
-/** The grid corner, faded into the page colour with `dark:` classes rather than theme state. */
+/**
+ * The background: the gradient bars rising from the floor of the page, the
+ * grid corner of the original over them, and the page colour held around the
+ * form so every label stays readable. All drawn with `dark:` classes and CSS
+ * variables rather than theme state, so it is right on the first frame.
+ */
 const BackgroundDecoration: React.FC = () => (
-  <div
-    aria-hidden
-    className="absolute right-0 top-0 z-0 size-[50vw]"
-    style={{
-      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' stroke-width='2' stroke='rgb(30 58 138 / 0.5)'%3e%3cpath d='M0 .5H31.5V32'/%3e%3c/svg%3e")`,
-    }}
-  >
-    <div className="absolute inset-0 bg-[radial-gradient(100%_100%_at_100%_0%,rgba(255,255,255,0),rgba(255,255,255,1))] dark:bg-[radial-gradient(100%_100%_at_100%_0%,rgba(9,9,11,0),rgba(9,9,11,1))]" />
+  <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+    <GradientBars
+      numBars={15}
+      gradientFrom="var(--auth-bar-from)"
+      gradientTo="transparent"
+      animationDuration={2.4}
+      className="opacity-90"
+    />
+
+    {/* A second, wider set behind the first: the bars read as one field of
+        colour rather than a row of stripes. */}
+    <GradientBars
+      numBars={7}
+      gradientFrom="var(--auth-bar-mid)"
+      gradientTo="transparent"
+      animationDuration={3.6}
+      className="blur-2xl"
+    />
+
+    {/* The corner grid of the original, over the colour. */}
+    <div
+      className="absolute right-0 top-0 size-[60vw] opacity-70 dark:opacity-50"
+      style={{
+        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' stroke-width='2' stroke='rgb(30 58 138 / 0.5)'%3e%3cpath d='M0 .5H31.5V32'/%3e%3c/svg%3e")`,
+        maskImage: "radial-gradient(100% 100% at 100% 0%, #000, transparent 70%)",
+        WebkitMaskImage: "radial-gradient(100% 100% at 100% 0%, #000, transparent 70%)",
+      }}
+    />
+
+    {/* Keeps the colour off the form itself. */}
+    <div className="absolute inset-0 bg-[radial-gradient(90%_62%_at_50%_38%,rgba(255,255,255,0.92)_35%,transparent_75%)] dark:bg-[radial-gradient(90%_62%_at_50%_38%,rgba(9,9,11,0.9)_35%,transparent_75%)]" />
   </div>
 )
 

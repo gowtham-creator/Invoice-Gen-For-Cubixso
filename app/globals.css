@@ -148,3 +148,20 @@ input[type="number"]::-webkit-inner-spin-button {
     font-size: 16px;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Sign-in background: the colours the gradient bars are drawn in
+ * (components/ui/gradient-bars-background.tsx). Cubixso Action Blue on the
+ * white page; the brighter blue DESIGN.md gives for dark surfaces on black,
+ * where a mid blue would sink.
+ * ------------------------------------------------------------------------ */
+
+:root {
+  --auth-bar-from: oklch(0.64 0.19 254 / 0.4);
+  --auth-bar-mid: oklch(0.74 0.15 214 / 0.22);
+}
+
+:root[data-theme="dark"] {
+  --auth-bar-from: oklch(0.62 0.22 258 / 0.62);
+  --auth-bar-mid: oklch(0.7 0.17 210 / 0.34);
+}
