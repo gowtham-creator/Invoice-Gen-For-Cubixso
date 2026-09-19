@@ -38,12 +38,9 @@
   status = 200
   force = true
 
-[[redirects]]
-  from = "/login"
-  to = "/login/"
-  status = 301
-  force = true
-
+# One rule serves both /login and /login/: Netlify ignores a trailing slash
+# when matching, so a separate /login -> /login/ redirect also caught /login/
+# and sent it to itself, in a loop no browser would open.
 [[redirects]]
   from = "/login/*"
   to = "/login/:splat"
