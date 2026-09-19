@@ -21,6 +21,7 @@
 import * as React from "react"
 import { ChevronLeft, LoaderCircle } from "lucide-react"
 import { motion } from "motion/react"
+import { Glass } from "@samasante/liquid-glass"
 import { GradientBars } from "@/components/ui/gradient-bars-background"
 
 export type AuthMode = "sign-in" | "set-password" | "reset-password"
@@ -71,16 +72,69 @@ const AuthForm: React.FC<AuthFormProps> = (props) => {
         transition={{ duration: 1.25, ease: "easeInOut" }}
         className="relative z-10 mx-auto w-full max-w-xl p-4"
       >
-        <div className="rounded-2xl border border-zinc-200/80 bg-white/75 p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_24px_60px_-20px_rgba(16,24,40,0.28)] backdrop-blur-xl sm:p-8 dark:border-white/10 dark:bg-zinc-900/55 dark:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset,0_28px_70px_-24px_rgba(0,0,0,0.85)]">
+        <Card>
           <Logo />
           <Header mode={props.mode} />
           <Messages error={props.error} notice={props.notice} />
           <LoginForm {...props} />
           <Footnote />
-        </div>
+        </Card>
       </motion.div>
       <BackgroundDecoration />
     </div>
+  )
+}
+
+const CARD_SHADOW =
+  "shadow-[0_1px_2px_rgba(16,24,40,0.04),0_24px_60px_-20px_rgba(16,24,40,0.3)] dark:shadow-[0_28px_70px_-24px_rgba(0,0,0,0.85)]"
+
+/**
+ * True where the liquid-glass lens is worth its cost: a pointer device with a
+ * real window. The lens refracts through an SVG filter on the backdrop, which
+ * measured about three times the frame cost of a plain blur, and Safari (so
+ * every iPad and iPhone) ignores that kind of filter and frosts instead. Touch
+ * devices therefore get the CSS card, which is what they would have seen
+ * anyway, without paying for a filter they cannot show.
+ */
+function useLensWorthwhile() {
+  const [ok, setOk] = React.useState(false)
+  React.useEffect(() => {
+    const fine = window.matchMedia("(pointer: fine) and (min-width: 720px)")
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)")
+    const apply = () => setOk(fine.matches && !still.matches)
+    apply()
+    fine.addEventListener("change", apply)
+    still.addEventListener("change", apply)
+    return () => {
+      fine.removeEventListener("change", apply)
+      still.removeEventListener("change", apply)
+    }
+  }, [])
+  return ok
+}
+
+/** The pane the form sits on: a lens where that is worthwhile, frosted glass otherwise. */
+const Card: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const lens = useLensWorthwhile()
+  if (!lens) {
+    return (
+      <div
+        className={`rounded-[20px] border border-zinc-200/80 bg-white/75 p-6 backdrop-blur-xl sm:p-8 dark:border-white/10 dark:bg-zinc-900/55 ${CARD_SHADOW}`}
+      >
+        {children}
+      </div>
+    )
+  }
+  return (
+    <Glass
+      radius={20}
+      optics={{ frost: 9, depth: 0.55, curvature: 0.45, dispersion: 0.35, glow: 0.12 }}
+      className={`rounded-[20px] ${CARD_SHADOW}`}
+    >
+      <div className="rounded-[20px] border border-zinc-200/70 bg-white/45 p-6 sm:p-8 dark:border-white/10 dark:bg-zinc-900/35">
+        {children}
+      </div>
+    </Glass>
   )
 }
 
@@ -319,7 +373,7 @@ const BackgroundDecoration: React.FC = () => (
     <GradientBars
       numBars={15}
       gradientFrom="var(--auth-bar-from)"
-      gradientTo="transparent"
+      gradientTo="var(--auth-bar-to)"
       animationDuration={2.4}
       className="opacity-90"
     />
@@ -329,7 +383,7 @@ const BackgroundDecoration: React.FC = () => (
     <GradientBars
       numBars={7}
       gradientFrom="var(--auth-bar-mid)"
-      gradientTo="transparent"
+      gradientTo="var(--auth-bar-to)"
       animationDuration={3.6}
       className="blur-2xl"
     />
@@ -345,7 +399,7 @@ const BackgroundDecoration: React.FC = () => (
     />
 
     {/* Keeps the colour off the form itself. */}
-    <div className="absolute inset-0 bg-[radial-gradient(90%_62%_at_50%_38%,rgba(255,255,255,0.92)_35%,transparent_75%)] dark:bg-[radial-gradient(90%_62%_at_50%_38%,rgba(9,9,11,0.9)_35%,transparent_75%)]" />
+    <div className="absolute inset-0 bg-[radial-gradient(85%_58%_at_50%_34%,rgba(255,255,255,0.6)_30%,transparent_78%)] dark:bg-[radial-gradient(85%_58%_at_50%_34%,rgba(9,9,11,0.62)_30%,transparent_78%)]" />
   </div>
 )
 

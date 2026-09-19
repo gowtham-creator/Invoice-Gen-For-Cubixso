@@ -157,11 +157,15 @@ input[type="number"]::-webkit-inner-spin-button {
  * ------------------------------------------------------------------------ */
 
 :root {
-  --auth-bar-from: oklch(0.64 0.19 254 / 0.4);
-  --auth-bar-mid: oklch(0.74 0.15 214 / 0.22);
+  --auth-bar-from: oklch(0.64 0.19 254 / 0.44);
+  --auth-bar-mid: oklch(0.74 0.15 214 / 0.24);
+  /* The bars fade to a tint rather than to nothing, so colour still reaches
+     the card and the lens has something to bend. */
+  --auth-bar-to: oklch(0.7 0.13 244 / 0.12);
 }
 
 :root[data-theme="dark"] {
-  --auth-bar-from: oklch(0.62 0.22 258 / 0.62);
-  --auth-bar-mid: oklch(0.7 0.17 210 / 0.34);
+  --auth-bar-from: oklch(0.62 0.22 258 / 0.66);
+  --auth-bar-mid: oklch(0.7 0.17 210 / 0.36);
+  --auth-bar-to: oklch(0.55 0.2 262 / 0.16);
 }
