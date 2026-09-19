@@ -70,7 +70,7 @@ export function MoneyInput({
           setDraft(e.target.value);
           onChange(parseMoney(e.target.value, currency));
         }}
-        className={`${inputClass} tnum h-8 pl-7 ${align === "right" ? "text-right" : ""}`}
+        className={`${inputClass} tnum h-8 pointer-coarse:h-10 pl-7 ${align === "right" ? "text-right" : ""}`}
       />
     </div>
   );
@@ -134,7 +134,7 @@ export function NumberInput({
           setDraft(null);
         }}
         onChange={(e) => commit(e.target.value)}
-        className={`${inputClass} tnum h-8 text-right ${suffix ? "pr-6" : ""}`}
+        className={`${inputClass} tnum h-8 pointer-coarse:h-10 text-right ${suffix ? "pr-6" : ""}`}
       />
       {suffix ? (
         <span

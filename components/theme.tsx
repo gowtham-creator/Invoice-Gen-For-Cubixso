@@ -32,7 +32,14 @@ interface ThemeCtxValue {
 
 const ThemeCtx = createContext<ThemeCtxValue | null>(null);
 
+/**
+ * The sign-in page follows the device alone. It has no toggle, so a choice
+ * made inside the app must not carry onto it. Mirrored in app/layout.tsx.
+ */
+const followsDeviceOnly = () => window.location.pathname.startsWith("/login");
+
 function readStored(): Theme {
+  if (followsDeviceOnly()) return "system";
   try {
     const v = window.localStorage.getItem(THEME_KEY);
     if (v === "light" || v === "dark" || v === "system") return v;
@@ -152,7 +159,7 @@ export function ThemeToggle() {
       onClick={cycle}
       aria-label={`Theme: ${label}. Activate for ${next}.`}
       title={`Theme: ${label}. Next: ${next}`}
-      className="grid size-8 shrink-0 place-items-center rounded-md text-ink-2 transition-colors duration-150 hover:bg-well hover:text-ink active:bg-line"
+      className="grid size-8 pointer-coarse:size-10 shrink-0 place-items-center rounded-md text-ink-2 transition-colors duration-150 hover:bg-well hover:text-ink active:bg-line"
     >
       <AnimatePresence mode="wait" initial={false}>
         <motion.span

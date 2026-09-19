@@ -8,10 +8,12 @@
 import { EditorScreen } from "./editor-screen";
 import { Home } from "./home";
 import { useRoute } from "./router";
+import { useKeepSessionAlive } from "./session";
 import { ToastProvider } from "./toast";
 
 export default function App() {
   const [route, go, back] = useRoute();
+  useKeepSessionAlive();
   return (
     <ToastProvider>
       {route.name === "home" ? (

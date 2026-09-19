@@ -67,7 +67,7 @@ export function Field({
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className={`${inputClass} h-8 ${mono ? "tnum" : ""}`}
+        className={`${inputClass} h-8 pointer-coarse:h-10 ${mono ? "tnum" : ""}`}
       />
       <Hint>{hint}</Hint>
     </div>
@@ -133,7 +133,7 @@ export function Select<T extends string | number>({
           id={id}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={`${inputClass} h-8 cursor-pointer appearance-none truncate pr-8`}
+          className={`${inputClass} h-8 pointer-coarse:h-10 cursor-pointer appearance-none truncate pr-8`}
         >
           {options.map((o) => (
             <option key={String(o.value)} value={o.value}>
@@ -185,7 +185,7 @@ export function Segmented<T extends string>({
               role="radio"
               aria-checked={active}
               onClick={() => onChange(o.value)}
-              className={`relative h-7 flex-1 rounded-md px-2 text-[12.5px] font-medium transition-colors duration-150 ${
+              className={`relative h-7 pointer-coarse:h-9 flex-1 rounded-md px-2 text-[12.5px] font-medium transition-colors duration-150 ${
                 active ? "text-ink" : "text-ink-2 hover:text-ink"
               }`}
             >
@@ -275,7 +275,7 @@ export function Button({
       onClick={onClick}
       disabled={disabled}
       className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md font-medium whitespace-nowrap transition-[background-color,border-color,color,transform] duration-150 disabled:cursor-not-allowed ${
-        size === "sm" ? "h-7 px-2.5 text-[12px]" : "h-8 px-3 text-[13px]"
+        size === "sm" ? "h-7 pointer-coarse:h-9 px-2.5 text-[12px]" : "h-8 pointer-coarse:h-10 px-3 text-[13px]"
       } ${buttonStyles[variant]}`}
     >
       {children}

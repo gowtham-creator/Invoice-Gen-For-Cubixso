@@ -146,14 +146,17 @@ function Loaded({
 
       {/* Pane switch, narrow screens only. */}
       <div className="shrink-0 border-b border-line bg-canvas px-4 py-2 lg:hidden">
-        <Segmented
-          value={pane}
-          onChange={setPane}
-          options={[
-            { value: "edit", label: "Edit" },
-            { value: "preview", label: "Invoice" },
-          ]}
-        />
+        {/* Held to the editor's reading width on a tablet held upright. */}
+        <div className="mx-auto max-w-[680px]">
+          <Segmented
+            value={pane}
+            onChange={setPane}
+            options={[
+              { value: "edit", label: "Edit" },
+              { value: "preview", label: "Invoice" },
+            ]}
+          />
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1">
@@ -163,21 +166,27 @@ function Loaded({
           }`}
         >
           <div className="min-h-0 flex-1 overflow-y-auto">
-            <Editor invoice={invoice} set={set} />
+            {/* Full width on a phone and in the split view; on a portrait
+                tablet the form would otherwise run 800px wide. */}
+            <div className="mx-auto w-full max-w-[680px] lg:max-w-none">
+              <Editor invoice={invoice} set={set} />
+            </div>
           </div>
 
           {/* The total, always in view while editing. */}
-          <div className="flex shrink-0 items-end justify-between gap-4 border-t border-line bg-canvas px-5 py-3">
-            <div className="min-w-0">
-              <p className="text-[12px] font-medium text-ink-2">Total due</p>
-              <p className="tnum truncate text-[12px] text-ink-3">
-                {formatMoney(totals.taxableMinor, currency)}
-                {totals.taxMinor > 0 ? ` + ${formatMoney(totals.taxMinor, currency)} GST` : isGst ? "" : " · no GST"}
+          <div className="shrink-0 border-t border-line bg-canvas px-5 py-3">
+            <div className="mx-auto flex max-w-[640px] items-end justify-between gap-4 lg:max-w-none">
+              <div className="min-w-0">
+                <p className="text-[12px] font-medium text-ink-2">Total due</p>
+                <p className="tnum truncate text-[12px] text-ink-3">
+                  {formatMoney(totals.taxableMinor, currency)}
+                  {totals.taxMinor > 0 ? ` + ${formatMoney(totals.taxMinor, currency)} GST` : isGst ? "" : " · no GST"}
+                </p>
+              </div>
+              <p className="tnum shrink-0 text-[20px] font-semibold tracking-[-0.01em] text-ink">
+                {formatMoney(totals.grandTotalMinor, currency)}
               </p>
             </div>
-            <p className="tnum shrink-0 text-[20px] font-semibold tracking-[-0.01em] text-ink">
-              {formatMoney(totals.grandTotalMinor, currency)}
-            </p>
           </div>
         </aside>
 
@@ -200,7 +209,7 @@ function NotFound() {
       </p>
       <a
         href={hrefFor({ name: "home" })}
-        className="mt-2 inline-flex h-8 items-center rounded-md bg-accent px-3 text-[13px] font-medium text-white hover:bg-accent-strong"
+        className="mt-2 inline-flex h-8 pointer-coarse:h-10 items-center rounded-md bg-accent px-3 text-[13px] font-medium text-white hover:bg-accent-strong"
       >
         Back to invoices
       </a>

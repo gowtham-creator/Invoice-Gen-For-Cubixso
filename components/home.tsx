@@ -26,6 +26,7 @@ import { fmtDate, type ExportFormat } from "@/lib/export/shared";
 import type { Invoice } from "@/lib/invoice-types";
 import { Menu } from "./menu";
 import type { Route } from "./router";
+import { SignOutButton } from "./session";
 import { ThemeToggle } from "./theme";
 import { useToast } from "./toast";
 
@@ -81,6 +82,7 @@ export function Home({ go }: { go: (r: Route) => void }) {
         <span className="text-[13px] font-semibold text-ink">Invoices</span>
         <div className="ml-auto flex items-center gap-1.5">
           <ThemeToggle />
+          <SignOutButton />
           <NewInvoice onStart={start} />
         </div>
       </header>
@@ -105,7 +107,7 @@ export function Home({ go }: { go: (r: Route) => void }) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search by client or number"
-                className="h-8 w-full rounded-md border border-edge bg-field pr-2.5 pl-8 text-[13px] text-ink placeholder:text-ink-3 transition-[border-color,box-shadow] duration-150 hover:border-edge-strong focus:border-accent focus:ring-[3px] focus:ring-accent/15 focus:outline-none"
+                className="h-8 pointer-coarse:h-10 w-full rounded-md border border-edge bg-field pr-2.5 pl-8 text-[13px] text-ink placeholder:text-ink-3 transition-[border-color,box-shadow] duration-150 hover:border-edge-strong focus:border-accent focus:ring-[3px] focus:ring-accent/15 focus:outline-none"
               />
             </label>
           )}
@@ -115,7 +117,7 @@ export function Home({ go }: { go: (r: Route) => void }) {
           <EmptyState onStart={start} />
         ) : (
           <div className="overflow-visible rounded-lg border border-line bg-field shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
-            <div className="hidden grid-cols-[72px_1fr_120px_150px_140px_40px] gap-3 border-b border-line px-4 py-2.5 text-[12px] font-medium text-ink-3 sm:grid">
+            <div className="hidden grid-cols-[56px_1fr_100px_124px_116px_40px] gap-3 lg:grid-cols-[72px_1fr_120px_150px_140px_40px] border-b border-line px-4 py-2.5 text-[12px] font-medium text-ink-3 sm:grid">
               <span>No.</span>
               <span>Client</span>
               <span>Date</span>
@@ -170,7 +172,7 @@ function Row({
   const status = record.exportedAt ? `Exported ${shortDate(record.exportedAt)}` : "Draft";
 
   return (
-    <li className="group relative grid grid-cols-[1fr_auto_32px] items-center gap-3 px-4 py-3 transition-colors duration-100 hover:bg-well sm:grid-cols-[72px_1fr_120px_150px_140px_40px]">
+    <li className="group relative grid grid-cols-[1fr_auto_40px] items-center gap-3 px-4 py-3 transition-colors duration-100 hover:bg-well sm:grid-cols-[56px_1fr_100px_124px_116px_40px] lg:grid-cols-[72px_1fr_120px_150px_140px_40px]">
       {/* The whole row opens the invoice; the menu sits above this layer. */}
       <button type="button" onClick={onOpen} className="absolute inset-0 rounded-none" aria-label={`Open invoice ${inv.number}`} />
       <span className="tnum pointer-events-none hidden text-[13px] text-ink-2 sm:block">{inv.number}</span>
@@ -211,7 +213,7 @@ function Row({
               type="button"
               {...props}
               aria-label={`Actions for invoice ${inv.number}`}
-              className="grid size-8 place-items-center rounded-md text-ink-3 transition-colors duration-150 hover:bg-line hover:text-ink aria-expanded:bg-line aria-expanded:text-ink"
+              className="grid size-8 pointer-coarse:size-10 place-items-center rounded-md text-ink-3 transition-colors duration-150 hover:bg-line hover:text-ink aria-expanded:bg-line aria-expanded:text-ink"
             >
               <MoreHorizontal size={16} />
             </button>
@@ -224,7 +226,7 @@ function Row({
 
 function NewInvoice({ onStart }: { onStart: (kind: Invoice["kind"]) => void }) {
   const base =
-    "inline-flex h-8 items-center gap-1.5 bg-accent text-[13px] font-medium text-white transition-[background-color,transform] duration-150 hover:bg-accent-strong active:translate-y-px";
+    "inline-flex h-8 pointer-coarse:h-10 items-center gap-1.5 bg-accent text-[13px] font-medium text-white transition-[background-color,transform] duration-150 hover:bg-accent-strong active:translate-y-px";
   return (
     <div className="flex rounded-md shadow-[0_1px_2px_rgba(16,24,40,0.15)]">
       <button type="button" onClick={() => onStart("gst")} className={`${base} rounded-l-md px-3`}>
@@ -260,7 +262,7 @@ function EmptyState({ onStart }: { onStart: (kind: Invoice["kind"]) => void }) {
         <button
           type="button"
           onClick={() => onStart("gst")}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-accent px-3 text-[13px] font-medium text-white shadow-[0_1px_2px_rgba(16,24,40,0.15)] transition-colors hover:bg-accent-strong"
+          className="inline-flex h-8 pointer-coarse:h-10 items-center gap-1.5 rounded-md bg-accent px-3 text-[13px] font-medium text-white shadow-[0_1px_2px_rgba(16,24,40,0.15)] transition-colors hover:bg-accent-strong"
         >
           <FilePlus2 size={15} />
           New tax invoice
@@ -268,7 +270,7 @@ function EmptyState({ onStart }: { onStart: (kind: Invoice["kind"]) => void }) {
         <button
           type="button"
           onClick={() => onStart("non-gst")}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-edge bg-field px-3 text-[13px] font-medium text-ink transition-colors hover:border-edge-strong hover:bg-well"
+          className="inline-flex h-8 pointer-coarse:h-10 items-center gap-1.5 rounded-md border border-edge bg-field px-3 text-[13px] font-medium text-ink transition-colors hover:border-edge-strong hover:bg-well"
         >
           Invoice without GST
         </button>

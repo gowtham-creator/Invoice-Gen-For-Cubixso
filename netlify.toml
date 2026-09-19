@@ -18,3 +18,96 @@
   for = "/fonts/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# ---------------------------------------------------------------------------
+# Sign-in gate. The invoicer is served only to a Netlify Identity account with
+# the "owner" role (lib/auth.ts). Netlify's CDN checks the role inside the
+# signed nf_jwt cookie before serving anything, so the app never reaches a
+# browser that has not signed in. Rules run top to bottom; the first match
+# wins, and `force` makes each apply even though the files exist.
+# ---------------------------------------------------------------------------
+
+# Open to everyone: Identity's own endpoints, the sign-in page, and what that
+# page needs to draw. /_next/ holds the compiled code, which carries no
+# invoices (those live in the browser); the images are the logo, signature and
+# seal the invoices embed, already public in the repository, and kept open so a
+# PDF still renders if the session lapses while the tab is open.
+[[redirects]]
+  from = "/.netlify/*"
+  to = "/.netlify/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/login"
+  to = "/login/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/login/*"
+  to = "/login/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/_next/*"
+  to = "/_next/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/fonts/*"
+  to = "/fonts/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/cubixso-logo.png"
+  to = "/cubixso-logo.png"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/cubixso-logo-light.png"
+  to = "/cubixso-logo-light.png"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/signature.png"
+  to = "/signature.png"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/signature-light.png"
+  to = "/signature-light.png"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/seal.png"
+  to = "/seal.png"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/seal-light.png"
+  to = "/seal-light.png"
+  status = 200
+  force = true
+
+# Everything else: the owner gets the app, anyone else the sign-in page.
+[[redirects]]
+  from = "/*"
+  to = "/:splat"
+  status = 200
+  force = true
+  conditions = {Role = ["owner"]}
+
+[[redirects]]
+  from = "/*"
+  to = "/login/"
+  status = 302
+  force = true

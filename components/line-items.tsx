@@ -186,7 +186,7 @@ export function LineItemsEditor({
                               value={item.hsn}
                               placeholder="998314"
                               onChange={(e) => patch(item.id, { hsn: e.target.value })}
-                              className={`${inputClass} tnum h-8`}
+                              className={`${inputClass} tnum h-8 pointer-coarse:h-10`}
                             />
                           </div>
                         </div>

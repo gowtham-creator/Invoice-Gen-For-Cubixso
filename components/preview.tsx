@@ -21,6 +21,7 @@ import { redrawImage } from "@/lib/export/browser";
 import { renderInvoicePdf } from "@/pdf/render";
 import { PALETTES } from "@/pdf/theme";
 import { useTheme } from "./theme";
+import { PdfSheet } from "./pdf-sheet";
 
 /** Long enough to skip most intermediate keystrokes, short enough to feel live. */
 const DEBOUNCE_MS = 400;
@@ -126,7 +127,7 @@ export function Preview({ invoice }: { invoice: Invoice }) {
               The invoice could not be drawn: {error}
             </div>
           ) : shown ? (
-            <iframe title="Invoice" src={`${shown.url}#toolbar=0&navpanes=0&view=Fit`} className="size-full" />
+            <PdfSheet url={shown.url} title="Invoice" />
           ) : (
             <SheetSkeleton dark={variant === "dark"} />
           )}
