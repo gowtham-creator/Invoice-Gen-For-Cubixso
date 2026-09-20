@@ -21,8 +21,8 @@
 import * as React from "react"
 import { ChevronLeft, LoaderCircle } from "lucide-react"
 import { motion } from "motion/react"
-import { Glass } from "@samasante/liquid-glass"
 import { GradientBars } from "@/components/ui/gradient-bars-background"
+import { GlassEffect, GlassFilter } from "@/components/ui/liquid-glass"
 
 export type AuthMode = "sign-in" | "set-password" | "reset-password"
 
@@ -89,14 +89,13 @@ const CARD_SHADOW =
   "shadow-[0_1px_2px_rgba(16,24,40,0.04),0_24px_60px_-20px_rgba(16,24,40,0.3)] dark:shadow-[0_28px_70px_-24px_rgba(0,0,0,0.85)]"
 
 /**
- * True where the liquid-glass lens is worth its cost: a pointer device with a
- * real window. The lens refracts through an SVG filter on the backdrop, which
- * measured about three times the frame cost of a plain blur, and Safari (so
- * every iPad and iPhone) ignores that kind of filter and frosts instead. Touch
- * devices therefore get the CSS card, which is what they would have seen
- * anyway, without paying for a filter they cannot show.
+ * True where the glass is worth its cost: a pointer device with a real
+ * window. The pane refracts its backdrop through an SVG displacement filter,
+ * which Safari cannot apply to a backdrop at all, so a phone or tablet would
+ * pay for a filter it will not show. Those get the frosted card instead,
+ * which is what they would have seen anyway.
  */
-function useLensWorthwhile() {
+function useGlassWorthwhile() {
   const [ok, setOk] = React.useState(false)
   React.useEffect(() => {
     const fine = window.matchMedia("(pointer: fine) and (min-width: 720px)")
@@ -113,10 +112,10 @@ function useLensWorthwhile() {
   return ok
 }
 
-/** The pane the form sits on: a lens where that is worthwhile, frosted glass otherwise. */
+/** The pane the form sits on: liquid glass where that is worthwhile, frosted glass otherwise. */
 const Card: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const lens = useLensWorthwhile()
-  if (!lens) {
+  const glass = useGlassWorthwhile()
+  if (!glass) {
     return (
       <div
         className={`rounded-[20px] border border-zinc-200/80 bg-white/75 p-6 backdrop-blur-xl sm:p-8 dark:border-white/10 dark:bg-zinc-900/55 ${CARD_SHADOW}`}
@@ -126,15 +125,15 @@ const Card: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     )
   }
   return (
-    <Glass
-      radius={20}
-      optics={{ frost: 9, depth: 0.55, curvature: 0.45, dispersion: 0.35, glow: 0.12 }}
-      className={`rounded-[20px] ${CARD_SHADOW}`}
-    >
-      <div className="rounded-[20px] border border-zinc-200/70 bg-white/45 p-6 sm:p-8 dark:border-white/10 dark:bg-zinc-900/35">
-        {children}
-      </div>
-    </Glass>
+    <>
+      <GlassFilter />
+      <GlassEffect
+        className="rounded-[20px]"
+        style={{ boxShadow: "0 6px 16px rgba(16,24,40,0.12), 0 28px 70px -24px rgba(16,24,40,0.45)" }}
+      >
+        <div className="w-full rounded-[20px] p-6 sm:p-8 dark:bg-zinc-950/35">{children}</div>
+      </GlassEffect>
+    </>
   )
 }
 
