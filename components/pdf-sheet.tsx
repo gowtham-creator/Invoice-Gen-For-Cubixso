@@ -1,18 +1,23 @@
 "use client";
 
 /**
- * Shows a rendered invoice PDF inside the sheet.
+ * Shows a rendered invoice PDF inside the sheet: its pages drawn with pdf.js
+ * onto canvases sized to the sheet.
  *
- * Desktop browsers embed a PDF natively, and the native viewer is the most
- * faithful and the cheapest (it draws off the main thread), so they keep the
- * iframe. Tablets and phones cannot be trusted with one: iPad and iPhone
- * Safari draw only the first page of an embedded PDF and ignore the fit
- * setting, and Android shows nothing at all. There the pages are drawn with
- * pdf.js onto canvases sized to the sheet, so the invoice fits the width of
- * the screen and every page can be scrolled.
+ * An embedded PDF would be cheaper, because the browser's own viewer draws it
+ * off the main thread, but it cannot be made to match the app:
+ * - The viewer frames the page in its own backdrop, whose colour follows the
+ *   browser, not the theme. In dark mode that drew a white border around a
+ *   black invoice.
+ * - iPad and iPhone Safari show only the first page of an embedded PDF and
+ *   ignore the fit setting, and Android shows nothing at all.
+ *
+ * Drawn here, the only thing around the page is the sheet, which is themed.
+ * If pdf.js fails, a browser that can embed a PDF falls back to doing so:
+ * a white border beats no invoice.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type PdfJs = typeof import("pdfjs-dist/legacy/build/pdf.mjs");
 
@@ -36,15 +41,14 @@ function loadPdfJs(): Promise<PdfJs> {
 }
 
 export function PdfSheet({ url, title }: { url: string; title: string }) {
-  const [native] = useState(canEmbedPdf);
-  return native ? (
-    <iframe title={title} src={`${url}#toolbar=0&navpanes=0&view=Fit`} className="size-full" />
-  ) : (
-    <CanvasPages url={url} title={title} />
-  );
+  const [fallback, setFallback] = useState(false);
+  // Stable, or the draw effect below would re-run on every render.
+  const onFail = useCallback(() => setFallback(canEmbedPdf()), []);
+  if (fallback) return <iframe title={title} src={`${url}#toolbar=0&navpanes=0&view=Fit`} className="size-full" />;
+  return <CanvasPages url={url} title={title} onFail={onFail} />;
 }
 
-function CanvasPages({ url, title }: { url: string; title: string }) {
+function CanvasPages({ url, title, onFail }: { url: string; title: string; onFail: () => void }) {
   const box = useRef<HTMLDivElement>(null);
   const pages = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -95,14 +99,16 @@ function CanvasPages({ url, title }: { url: string; title: string }) {
         task = null;
         await done.destroy();
       } catch (e) {
-        if (live) setFailed(e instanceof Error ? e.message : String(e));
+        if (!live) return;
+        setFailed(e instanceof Error ? e.message : String(e));
+        onFail();
       }
     })();
     return () => {
       live = false;
       void task?.destroy();
     };
-  }, [url, width]);
+  }, [url, width, onFail]);
 
   return (
     <div ref={box} role="img" aria-label={title} className="size-full overflow-y-auto overscroll-contain">
