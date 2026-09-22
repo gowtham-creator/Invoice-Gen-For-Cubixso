@@ -7,17 +7,19 @@
  * is what the renderer produces. Regeneration is debounced and the previous
  * page stays up while the next renders, so typing never blanks the sheet.
  *
- * It follows the theme. On a dark screen it shows the template's dark variant
- * of the invoice, so a bright white page does not glare out of a dark
- * interface. This sheet is for editing only: downloads, exports and the
- * preview screen always render the light document, which is what a client
- * receives.
+ * It follows the theme. On a dark screen the page is shown dark, so a bright
+ * white sheet does not glare out of a dark interface. The dark page is the
+ * light one through a colour filter rather than a second render: rendering a
+ * dark PDF on every switch left the invoice 250-300 ms behind the interface,
+ * showing the wrong theme meanwhile, where the filter is applied by the GPU
+ * in the same frame. The filter is tuned so white paper lands exactly on the
+ * dark palette's #0a0a0a. This sheet is for editing only: downloads, exports
+ * and the preview screen always render the light document, which is what a
+ * client receives.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Invoice } from "@/lib/invoice-types";
-import { isCustomSignature } from "@/lib/defaults";
-import { redrawImage } from "@/lib/export/browser";
 import { renderInvoicePdf } from "@/pdf/render";
 import { PALETTES } from "@/pdf/theme";
 import { useTheme } from "./theme";
@@ -36,47 +38,32 @@ function useDebounced<T>(value: T, ms: number): T {
 }
 
 /**
- * An uploaded signature redrawn in the dark palette's ink. The built-in one
- * has a pre-made twin; an upload cannot be known ahead of time.
+ * Light paper (#ffffff) onto the dark palette's paper (#0a0a0a): invert(p)
+ * maps white to 1 - p, and 10/255 = 0.039. The hue turn puts colours back on
+ * their own hue after the inversion, so the accent stays blue.
  */
-function useDarkSignature(invoice: Invoice, active: boolean): string | undefined {
-  const [out, setOut] = useState<{ src: string; dark: string } | null>(null);
-  const src = active && isCustomSignature(invoice) ? (invoice.signatureImage as string) : null;
-  useEffect(() => {
-    if (!src || out?.src === src) return;
-    let live = true;
-    redrawImage(src, [245, 245, 245])
-      .then((r) => live && setOut({ src, dark: r.dataUrl }))
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, [src, out?.src]);
-  return src && out?.src === src ? out.dark : undefined;
-}
+const DARK_FILTER = "invert(0.961) hue-rotate(180deg)";
 
 export function Preview({ invoice }: { invoice: Invoice }) {
   const { resolved } = useTheme();
-  const variant = resolved;
+  const dark = resolved === "dark";
   const settled = useDebounced(invoice, DEBOUNCE_MS);
-  const darkSignature = useDarkSignature(settled, variant === "dark");
-  // What the sheet should show; a render answers for exactly this key.
-  const key = useMemo(() => ({ settled, variant, darkSignature }), [settled, variant, darkSignature]);
-  const [shown, setShown] = useState<{ key: object; url: string } | null>(null);
+  const [shown, setShown] = useState<{ key: Invoice; url: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const current = useRef<string | null>(null);
 
   useEffect(() => {
     let live = true;
     // Rendered in a Web Worker (see pdf/render.ts), so typing never waits on it.
-    renderInvoicePdf(key.settled, key.variant, key.darkSignature)
+    // Always the light page: the theme is a filter over it, never a re-render.
+    renderInvoicePdf(settled, "light")
       .then((blob) => {
         // A newer edit superseded this render: drop it rather than show stale work.
         if (!live) return;
         const url = URL.createObjectURL(blob);
         const previous = current.current;
         current.current = url;
-        setShown({ key, url });
+        setShown({ key: settled, url });
         setError(null);
         // Every render is a ~330 KB file. Free the last one once the new one has
         // had time to load, or memory grows for as long as the invoice is edited.
@@ -86,7 +73,7 @@ export function Preview({ invoice }: { invoice: Invoice }) {
     return () => {
       live = false;
     };
-  }, [key]);
+  }, [settled]);
 
   useEffect(
     () => () => {
@@ -95,8 +82,7 @@ export function Preview({ invoice }: { invoice: Invoice }) {
     [],
   );
 
-  const busy = !shown || shown.key !== key || settled !== invoice;
-  const paper = PALETTES[variant].paper;
+  const busy = !shown || shown.key !== settled || settled !== invoice;
 
   return (
     <div className="flex h-full justify-center overflow-auto px-6 py-8">
@@ -112,25 +98,30 @@ export function Preview({ invoice }: { invoice: Invoice }) {
         </div>
 
         <div
-          className="aspect-[210/297] w-full overflow-hidden rounded-[3px] transition-colors duration-300"
-          /* The one real shadow in the interface: a sheet resting on a desk. */
+          className="aspect-[210/297] w-full overflow-hidden rounded-[3px] transition-shadow duration-200"
+          /* The one real shadow in the interface: a sheet resting on a desk.
+             It sits outside the filter, which would otherwise invert it into
+             a glow. */
           style={{
-            background: paper,
-            boxShadow:
-              variant === "dark"
-                ? "0 0 0 1px rgba(255,255,255,0.06), 0 12px 32px -8px rgba(0,0,0,0.6)"
-                : "0 1px 2px rgba(16,24,40,0.06), 0 12px 32px -8px rgba(16,24,40,0.18)",
+            boxShadow: dark
+              ? "0 0 0 1px rgba(255,255,255,0.06), 0 12px 32px -8px rgba(0,0,0,0.6)"
+              : "0 1px 2px rgba(16,24,40,0.06), 0 12px 32px -8px rgba(16,24,40,0.18)",
           }}
         >
-          {error && !shown ? (
-            <div className="flex h-full items-center justify-center p-10 text-center text-[13px] text-ink-2">
-              The invoice could not be drawn: {error}
-            </div>
-          ) : shown ? (
-            <PdfSheet url={shown.url} title="Invoice" />
-          ) : (
-            <SheetSkeleton dark={variant === "dark"} />
-          )}
+          <div
+            className="size-full transition-[filter] duration-200 ease-out"
+            style={{ background: PALETTES.light.paper, filter: dark ? DARK_FILTER : "none" }}
+          >
+            {error && !shown ? (
+              <div className="flex h-full items-center justify-center p-10 text-center text-[13px] text-[#494949]">
+                The invoice could not be drawn: {error}
+              </div>
+            ) : shown ? (
+              <PdfSheet url={shown.url} title="Invoice" />
+            ) : (
+              <SheetSkeleton />
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -138,8 +129,9 @@ export function Preview({ invoice }: { invoice: Invoice }) {
 }
 
 /** The first render, drawn as the page it is about to become. */
-function SheetSkeleton({ dark }: { dark: boolean }) {
-  const bar = `rounded-sm animate-pulse ${dark ? "bg-[#1f1f1f]" : "bg-[#eef0f3]"}`;
+function SheetSkeleton() {
+  // Drawn light, like the page; the sheet's filter darkens it with the theme.
+  const bar = "rounded-sm animate-pulse bg-[#eef0f3]";
   return (
     <div className="flex h-full flex-col gap-6 p-[6.7%]" aria-label="Preparing the invoice">
       <div className="flex justify-between">
