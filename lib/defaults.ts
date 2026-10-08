@@ -153,7 +153,7 @@ export function emptyItem(taxRatePercent = 18): LineItem {
   };
 }
 
-function today(): string {
+export function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
@@ -183,6 +183,7 @@ export function blankReceipt(): ReceiptDetails {
     reference: "",
     purpose: "",
     againstInvoice: "",
+    againstInvoiceId: null,
     invoiceTotalMinor: null,
     receivedEarlierMinor: 0,
   };
@@ -193,7 +194,44 @@ export function blankReceipt(): ReceiptDetails {
  * one written by hand or by an older build may be missing a field.
  */
 export function receiptOf(inv: Pick<Invoice, "receipt">): ReceiptDetails {
-  return { ...blankReceipt(), ...(inv.receipt ?? {}) };
+  const r = { ...blankReceipt(), ...(inv.receipt ?? {}) };
+  // Money read back is never negative, whatever was stored: a typed "-5000"
+  // would otherwise print a negative sum and "Minus …" in words. A total that
+  // is not positive reads as "not given", as it does in the editor.
+  return {
+    ...r,
+    amountMinor: nonNegative(r.amountMinor),
+    receivedEarlierMinor: nonNegative(r.receivedEarlierMinor),
+    invoiceTotalMinor: r.invoiceTotalMinor !== null && nonNegative(r.invoiceTotalMinor) > 0 ? r.invoiceTotalMinor : null,
+    againstInvoiceId: typeof r.againstInvoiceId === "string" && r.againstInvoiceId ? r.againstInvoiceId : null,
+  };
+}
+
+/** Zero for anything negative or not a number. */
+export function nonNegative(minor: number): number {
+  return Number.isFinite(minor) && minor > 0 ? minor : 0;
+}
+
+/**
+ * Whether two invoice numbers name the same invoice, as a person typing one
+ * would mean it: spaces at either end and letter case do not count, so
+ * "cbx-007 " is "CBX-007".
+ */
+export function sameInvoiceNumber(a: string, b: string): boolean {
+  const x = a.trim().toLowerCase();
+  return x !== "" && x === b.trim().toLowerCase();
+}
+
+/**
+ * A receipt with its invoice number retyped. A receipt linked to an invoice
+ * stays linked while the number still names that invoice; once it names
+ * another, the link is dropped so the number typed is what counts.
+ * `linkedNumber` is the linked invoice's current number, or null if that
+ * invoice is gone.
+ */
+export function retypeAgainstInvoice(r: ReceiptDetails, againstInvoice: string, linkedNumber: string | null): ReceiptDetails {
+  const keep = r.againstInvoiceId !== null && linkedNumber !== null && sameInvoiceNumber(againstInvoice, linkedNumber);
+  return { ...r, againstInvoice, againstInvoiceId: keep ? r.againstInvoiceId : null };
 }
 
 export function blankInvoice(kind: Invoice["kind"] = "gst"): Invoice {

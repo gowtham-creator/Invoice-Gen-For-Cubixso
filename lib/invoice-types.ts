@@ -37,6 +37,13 @@ export interface ReceiptDetails {
   purpose: string;
   /** The invoice number this payment is towards. Empty for an advance. */
   againstInvoice: string;
+  /**
+   * The record id of the invoice it was issued from, when "Issue receipt"
+   * made it. Numbers can be reused after a delete; ids cannot, so a linked
+   * receipt never attaches to a later invoice that took the same number.
+   * Null for a receipt typed by hand, which is matched by number instead.
+   */
+  againstInvoiceId: string | null;
   /** That invoice's grand total, so a balance can be printed. Null: none. */
   invoiceTotalMinor: number | null;
   /** The sum of earlier receipts against the same invoice. */

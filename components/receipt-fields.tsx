@@ -13,7 +13,8 @@
 import type { Invoice, PaymentMode, ReceiptDetails } from "@/lib/invoice-types";
 import { CURRENCIES, currencyOf, formatMoney } from "@/lib/currency";
 import { receiptBalance } from "@/lib/invoice-math";
-import { PAYMENT_MODES, receiptOf } from "@/lib/defaults";
+import { PAYMENT_MODES, nonNegative, receiptOf, retypeAgainstInvoice } from "@/lib/defaults";
+import { getInvoice } from "@/lib/storage";
 import { Field, Group, Label, Row, Select } from "./controls";
 import { MoneyInput } from "./money-input";
 
@@ -21,8 +22,26 @@ type Props = { invoice: Invoice; set: (patch: Partial<Invoice>) => void };
 
 function receiptState({ invoice, set }: Props) {
   const r = receiptOf(invoice);
-  const setReceipt = (patch: Partial<ReceiptDetails>) => set({ receipt: { ...r, ...patch } });
-  return { r, setReceipt, c: currencyOf(invoice.currencyCode) };
+  // Amounts are held at zero or more as they are typed: a minus sign would
+  // print a negative sum, and "Minus …" in words, on a receipt.
+  const setReceipt = (patch: Partial<ReceiptDetails>) => {
+    const next = { ...r, ...patch };
+    set({
+      receipt: {
+        ...next,
+        amountMinor: nonNegative(next.amountMinor),
+        receivedEarlierMinor: nonNegative(next.receivedEarlierMinor),
+        invoiceTotalMinor: next.invoiceTotalMinor !== null && next.invoiceTotalMinor > 0 ? next.invoiceTotalMinor : null,
+      },
+    });
+  };
+  // Retyping the invoice number of a receipt issued from an invoice keeps the
+  // link only while the number still names that invoice.
+  const setAgainstInvoice = (againstInvoice: string) => {
+    const linked = r.againstInvoiceId ? (getInvoice(r.againstInvoiceId)?.invoice.number ?? null) : null;
+    setReceipt(retypeAgainstInvoice(r, againstInvoice, linked));
+  };
+  return { r, setReceipt, setAgainstInvoice, c: currencyOf(invoice.currencyCode) };
 }
 
 export function ReceiptGroup(props: Props) {
@@ -78,7 +97,7 @@ export function ReceiptGroup(props: Props) {
 }
 
 export function AgainstInvoiceGroup(props: Props) {
-  const { r, setReceipt, c } = receiptState(props);
+  const { r, setReceipt, setAgainstInvoice, c } = receiptState(props);
   const b = receiptBalance(r);
   const standing =
     !r.againstInvoice.trim() || b.balanceMinor === null
@@ -94,7 +113,7 @@ export function AgainstInvoiceGroup(props: Props) {
         <Field
           label="Invoice no."
           value={r.againstInvoice}
-          onChange={(againstInvoice) => setReceipt({ againstInvoice })}
+          onChange={setAgainstInvoice}
           mono
           placeholder="Empty for an advance"
         />

@@ -18,7 +18,15 @@
  */
 
 import type { Invoice } from "./invoice-types";
-import { CUBIXSO_SELLER, RETIRED_SELLER_PHONES, blankInvoice, newId, receiptOf } from "./defaults";
+import {
+  CUBIXSO_SELLER,
+  RETIRED_SELLER_PHONES,
+  blankInvoice,
+  newId,
+  receiptOf,
+  sameInvoiceNumber,
+  today,
+} from "./defaults";
 import { computeTotals } from "./invoice-math";
 
 const RECORDS_KEY = "cubixso.invoices.v2";
@@ -216,8 +224,12 @@ export function createInvoice(kind: Invoice["kind"]): InvoiceRecord {
 
 /**
  * A copy under the next number in its own series, as a fresh draft: the usual
- * start for a repeat bill, or for the next tranche of a payment. A receipt's
- * copy counts its source as received earlier, so its balance stays true.
+ * start for a repeat bill, or for the next tranche of a payment.
+ *
+ * A receipt's copy is the next payment, not the same one again: it is dated
+ * today and loses the reference, which identified the earlier transfer. It
+ * counts what has been received so far, its source included once that was
+ * issued, so its balance stays true; an unissued source is not yet money in.
  */
 export function duplicateInvoice(id: string): InvoiceRecord | null {
   const records = listInvoices();
@@ -232,10 +244,18 @@ export function duplicateInvoice(id: string): InvoiceRecord | null {
       ...src,
       number: nextNumberFor(src.kind, records),
       items: src.items.map((i) => ({ ...i, id: newId() })),
-      receipt:
-        receipt && receipt.againstInvoice.trim()
-          ? { ...receipt, receivedEarlierMinor: receivedAgainst(records, receipt.againstInvoice, src.currencyCode) }
-          : receipt,
+      ...(receipt
+        ? {
+            issueDate: today(),
+            receipt: {
+              ...receipt,
+              reference: "",
+              receivedEarlierMinor: receipt.againstInvoice.trim()
+                ? receivedTowards(records, invoiceFor(records, receipt, src.currencyCode))
+                : receipt.receivedEarlierMinor,
+            },
+          }
+        : {}),
     },
     createdAt: now,
     updatedAt: now,
@@ -248,16 +268,17 @@ export function duplicateInvoice(id: string): InvoiceRecord | null {
 /**
  * Issues a receipt for an invoice: a new receipt for the same client, in the
  * same currency, signed and branded the same way, against that invoice's
- * number and total. The amount starts at what is still owed after earlier
- * receipts, which is right for a final payment and is edited down for a
- * part-payment. Only invoices take receipts; a receipt for a receipt is null.
+ * number and total, and linked to that invoice by id. The amount starts at
+ * what is still owed after earlier receipts, which is right for a final
+ * payment and is edited down for a part-payment. Only invoices take receipts;
+ * a receipt for a receipt is null.
  */
 export function createReceiptFor(invoiceId: string): InvoiceRecord | null {
   const records = listInvoices();
   const source = records.find((r) => r.id === invoiceId)?.invoice;
   if (!source || source.kind === "receipt") return null;
   const totalMinor = computeTotals(source).grandTotalMinor;
-  const earlier = receivedAgainst(records, source.number, source.currencyCode);
+  const earlier = receivedTowards(records, { id: invoiceId, number: source.number, currencyCode: source.currencyCode });
   const fresh = blankInvoice("receipt");
   const invoice: Invoice = {
     ...fresh,
@@ -276,6 +297,7 @@ export function createReceiptFor(invoiceId: string): InvoiceRecord | null {
     receipt: {
       ...receiptOf(fresh),
       againstInvoice: source.number.trim(),
+      againstInvoiceId: invoiceId,
       invoiceTotalMinor: totalMinor,
       receivedEarlierMinor: earlier,
       amountMinor: Math.max(0, totalMinor - earlier),
@@ -288,18 +310,50 @@ export function createReceiptFor(invoiceId: string): InvoiceRecord | null {
 }
 
 /**
- * Everything received against one invoice number in one currency: the sum of
- * the receipts that name it. Amounts in another currency are not added in, for
+ * Whether a receipt is money in. "Issue receipt" only starts a draft; the
+ * payment is acknowledged when the receipt leaves the app, as an invoice is
+ * sent when it does. Until then it marks nothing paid and adds to no total.
+ */
+export function countsAsReceived(record: InvoiceRecord): boolean {
+  return record.invoice.kind === "receipt" && record.exportedAt !== null;
+}
+
+/** An invoice as receipts point at it. `id` is null for one no record holds. */
+export interface InvoiceRef {
+  id: string | null;
+  number: string;
+  currencyCode: string;
+}
+
+/**
+ * Whether a receipt is towards an invoice. One issued from an invoice is tied
+ * to that record and to no other, so a later invoice that reuses a deleted
+ * one's number starts clean. One typed by hand names its invoice by number,
+ * with case and outer spaces ignored. Either way the currency must match, for
  * the same reason the home screen never adds dollars to rupees.
  */
-export function receivedAgainst(records: InvoiceRecord[], invoiceNumber: string, currencyCode: string): number {
-  const number = invoiceNumber.trim();
-  if (!number) return 0;
+export function receiptIsTowards(receipt: Invoice, target: InvoiceRef): boolean {
+  if (receipt.kind !== "receipt" || receipt.currencyCode !== target.currencyCode) return false;
+  const rc = receiptOf(receipt);
+  if (rc.againstInvoiceId !== null) return rc.againstInvoiceId === target.id;
+  return sameInvoiceNumber(rc.againstInvoice, target.number);
+}
+
+/** What has been received towards an invoice: its issued receipts, summed. */
+export function receivedTowards(records: InvoiceRecord[], target: InvoiceRef): number {
   return records
-    .filter((r) => r.invoice.kind === "receipt" && r.invoice.currencyCode === currencyCode)
-    .map((r) => receiptOf(r.invoice))
-    .filter((rc) => rc.againstInvoice.trim() === number)
-    .reduce((sum, rc) => sum + rc.amountMinor, 0);
+    .filter((r) => countsAsReceived(r) && receiptIsTowards(r.invoice, target))
+    .reduce((sum, r) => sum + receiptOf(r.invoice).amountMinor, 0);
+}
+
+/** The invoice a receipt points at, as a reference whether or not a record holds it. */
+function invoiceFor(records: InvoiceRecord[], rc: ReturnType<typeof receiptOf>, currencyCode: string): InvoiceRef {
+  if (rc.againstInvoiceId !== null) return { id: rc.againstInvoiceId, number: rc.againstInvoice, currencyCode };
+  const typed: InvoiceRef = { id: null, number: rc.againstInvoice, currencyCode };
+  const match = records.find(
+    (r) => r.invoice.kind !== "receipt" && r.invoice.currencyCode === currencyCode && sameInvoiceNumber(r.invoice.number, typed.number),
+  );
+  return match ? { ...typed, id: match.id } : typed;
 }
 
 function nextNumberFor(kind: Invoice["kind"], records: InvoiceRecord[]): string {
@@ -319,9 +373,20 @@ export function nextInvoiceNumber(records: InvoiceRecord[]): string {
   return nextInSeries(records.filter((r) => r.invoice.kind !== "receipt"), "001");
 }
 
-/** The next receipt number, in the receipts' own series: "R-001", "R-002", … */
+/**
+ * The next receipt number, in the receipts' own series: "R-001", "R-002", …
+ *
+ * Only numbers of that shape count. A receipt renamed "900" is the user's
+ * business, but it must not pull the series off its prefix ("901"), where it
+ * would look like an invoice number.
+ */
 export function nextReceiptNumber(records: InvoiceRecord[]): string {
-  return nextInSeries(records.filter((r) => r.invoice.kind === "receipt"), "R-001");
+  const top = records
+    .filter((r) => r.invoice.kind === "receipt")
+    .map((r) => /^R-(\d+)$/i.exec(r.invoice.number.trim()))
+    .filter((m): m is RegExpExecArray => m !== null)
+    .reduce((max, m) => Math.max(max, Number(m[1])), 0);
+  return `R-${String(top + 1).padStart(3, "0")}`;
 }
 
 function nextInSeries(records: InvoiceRecord[], first: string): string {

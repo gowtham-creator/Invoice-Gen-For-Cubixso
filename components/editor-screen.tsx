@@ -53,24 +53,37 @@ export function EditorScreen({
 }) {
   const [record] = useState(() => getInvoice(id));
   if (!record) return <NotFound />;
-  return <Loaded key={id} id={id} initial={record.invoice} previewing={previewing} go={go} back={back} />;
+  return (
+    <Loaded
+      key={id}
+      id={id}
+      initial={record.invoice}
+      initiallyExported={record.exportedAt !== null}
+      previewing={previewing}
+      go={go}
+      back={back}
+    />
+  );
 }
 
 function Loaded({
   id,
   initial,
+  initiallyExported,
   previewing,
   go,
   back,
 }: {
   id: string;
   initial: Invoice;
+  initiallyExported: boolean;
   previewing: boolean;
   go: (r: Route) => void;
   back: () => void;
 }) {
   const [invoice, setInvoice] = useState<Invoice>(initial);
   const [pane, setPane] = useState<Pane>("edit");
+  const [exported, setExported] = useState(initiallyExported);
   const opened = useRef(initial);
   const latest = useRef(initial);
   const dirty = useRef(false);
@@ -110,6 +123,7 @@ function Loaded({
 
   const onExported = useCallback(() => {
     markExported(id);
+    setExported(true);
   }, [id]);
 
   const totals = useMemo(() => computeTotals(invoice), [invoice]);
@@ -192,6 +206,8 @@ function Loaded({
                             ? " · paid in full"
                             : ` · ${formatMoney(balance.balanceMinor, currency)} balance due`
                         : ""}
+                      {/* A draft receipt marks nothing paid until it leaves the app. */}
+                      {exported ? "" : " · counts once downloaded"}
                     </p>
                   </div>
                   <p className="tnum shrink-0 text-[20px] font-semibold tracking-[-0.01em] text-ink">

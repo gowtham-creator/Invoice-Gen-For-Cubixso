@@ -168,3 +168,10 @@ test("a receipt's Word file says the same as its HTML", async () => {
 test("a receipt's file name says it is a receipt", () => {
   assert.equal(exportFileName(receipt(), "pdf"), "Receipt-R-001-Coltec-India-Private-Limited.pdf");
 });
+
+test("a receipt with a negative amount prints zero, never a minus", () => {
+  const html = invoiceToHtml(receipt({ amountMinor: -5000_00, receivedEarlierMinor: -100_00 }), htmlAssets);
+  assert.doesNotMatch(html, /Minus/);
+  assert.doesNotMatch(html, /-₹|₹-|−₹/);
+  assert.match(html, /the sum of <strong>₹0\.00<\/strong>/);
+});

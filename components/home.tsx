@@ -23,7 +23,7 @@ import {
 import { computeTotals } from "@/lib/invoice-math";
 import { currencyOf, formatMoney } from "@/lib/currency";
 import {
-  createInvoice, createReceiptFor, deleteInvoice, duplicateInvoice, listInvoices, markExported, receivedAgainst,
+  countsAsReceived, createInvoice, createReceiptFor, deleteInvoice, duplicateInvoice, listInvoices, markExported, receivedTowards,
   restoreInvoice, type InvoiceRecord,
 } from "@/lib/storage";
 import { receiptOf } from "@/lib/defaults";
@@ -66,7 +66,8 @@ export function Home({ go }: { go: (r: Route) => void }) {
       invoiceCount: records.filter((r) => !isReceipt(r)).length,
       receiptCount: records.filter(isReceipt).length,
       inrBilled: inr.filter((r) => !isReceipt(r)).reduce((sum, r) => sum + computeTotals(r.invoice).grandTotalMinor, 0),
-      inrReceived: inr.filter(isReceipt).reduce((sum, r) => sum + receiptOf(r.invoice).amountMinor, 0),
+      // Only issued receipts: a draft receipt is not yet money in.
+      inrReceived: inr.filter(countsAsReceived).reduce((sum, r) => sum + receiptOf(r.invoice).amountMinor, 0),
     };
   }, [records]);
 
@@ -156,7 +157,11 @@ export function Home({ go }: { go: (r: Route) => void }) {
                   <Row
                     key={r.id}
                     record={r}
-                    receivedMinor={isReceipt(r) ? 0 : receivedAgainst(records, r.invoice.number, r.invoice.currencyCode)}
+                    receivedMinor={
+                      isReceipt(r)
+                        ? 0
+                        : receivedTowards(records, { id: r.id, number: r.invoice.number, currencyCode: r.invoice.currencyCode })
+                    }
                     onOpen={() => go({ name: "invoice", id: r.id })}
                     onPreview={() => go({ name: "preview", id: r.id })}
                     onExport={(f) => exportRow(r, f)}
