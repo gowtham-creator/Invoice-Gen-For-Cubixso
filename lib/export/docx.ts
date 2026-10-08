@@ -186,24 +186,29 @@ export function buildInvoiceDocx(invoice: Invoice, assets: ExportAssets<DocxImag
     ...(p.email ? [para([run(p.email, { color: MUTED })])] : []),
     ...(p.phone ? [para([run(p.phone, { color: MUTED })])] : []),
   ];
-  const sellerTax = d.isGst ? (inv.seller.gstin ? `GSTIN ${inv.seller.gstin}` : "") : inv.seller.pan ? `PAN ${inv.seller.pan}` : "";
-  const buyerTax = d.isGst && inv.buyer.gstin ? `GSTIN ${inv.buyer.gstin}` : "";
+  const rc = d.receipt;
+  // A receipt names both GSTINs when it has them, as the HTML and PDF do.
+  const taxed = d.isGst || !!rc;
+  const sellerTax = taxed ? (inv.seller.gstin ? `GSTIN ${inv.seller.gstin}` : "") : inv.seller.pan ? `PAN ${inv.seller.pan}` : "";
+  const buyerTax = taxed && inv.buyer.gstin ? `GSTIN ${inv.buyer.gstin}` : "";
   const half = Math.floor(CONTENT / 2);
   const parties = table([half, CONTENT - half], [
     new TableRow({
       children: [
         cell(party("From", inv.seller, sellerTax), half, { right: 28 }),
-        cell(party("Billed to", inv.buyer, buyerTax), CONTENT - half),
+        cell(party(rc ? "Received from" : "Billed to", inv.buyer, buyerTax), CONTENT - half),
       ],
     }),
   ]);
 
-  const metaCells: [string, string][] = [
-    ["Issue date", fmtDate(inv.issueDate)],
-    ["Due date", fmtDate(inv.dueDate)],
-    ...(d.isGst ? ([["Place of supply", d.placeOfSupply]] as [string, string][]) : []),
-    ["Currency", `${d.c.code} · ${d.c.name}`],
-  ];
+  const metaCells: [string, string][] = rc
+    ? rc.meta
+    : [
+        ["Issue date", fmtDate(inv.issueDate)],
+        ["Due date", fmtDate(inv.dueDate)],
+        ...(d.isGst ? ([["Place of supply", d.placeOfSupply]] as [string, string][]) : []),
+        ["Currency", `${d.c.code} · ${d.c.name}`],
+      ];
   const metaW = Math.floor(CONTENT / metaCells.length);
   const meta = table(metaCells.map(() => metaW), [
     new TableRow({ children: metaCells.map(([k, v]) => cell([overline(k), para([run(v, { size: 9 })])], metaW, { right: 12 })) }),
@@ -249,8 +254,11 @@ export function buildInvoiceDocx(invoice: Invoice, assets: ExportAssets<DocxImag
   });
   const items = table(widths, [headRow, ...itemRows]);
 
-  // The ladder sits in the right half, under the amount column.
-  const ladder = table([half, CONTENT - half - CONTENT * 0.21, CONTENT * 0.21].map(Math.round), d.ladder.map(
+  // The ladder sits in the right half, under the amount column. A receipt's
+  // ladder is where its invoice stands, and may be empty: Word rejects a table
+  // with no rows, so an empty one is left out of the body below.
+  const ladderRows = rc ? rc.ladder : d.ladder;
+  const ladder = table([half, CONTENT - half - CONTENT * 0.21, CONTENT * 0.21].map(Math.round), ladderRows.map(
     (r) =>
       new TableRow({
         children: [
@@ -261,21 +269,22 @@ export function buildInvoiceDocx(invoice: Invoice, assets: ExportAssets<DocxImag
       }),
   ));
 
-  const figureSize = d.total.length <= 12 ? 40 : d.total.length <= 14 ? 34 : 28;
+  const figure = rc ? rc.amount : d.total;
+  const figureSize = figure.length <= 12 ? 40 : figure.length <= 14 ? 34 : 28;
   const grand = table([Math.round(CONTENT * 0.4), Math.round(CONTENT * 0.6)], [
     new TableRow({
       cantSplit: true,
       children: [
         cell(
           [
-            para([run("Total due", { size: 7.5, medium: true, color: MUTED, caps: true, track: 0.14 })]),
-            ...(d.payableBy ? [para([run(d.payableBy, { size: 9, color: SOFT })], { before: 3 })] : []),
+            para([run(rc ? "Amount received" : "Total due", { size: 7.5, medium: true, color: MUTED, caps: true, track: 0.14 })]),
+            ...(!rc && d.payableBy ? [para([run(d.payableBy, { size: 9, color: SOFT })], { before: 3 })] : []),
           ],
           Math.round(CONTENT * 0.4),
           { borders: { top: line(INK, 8) }, top: 10, align: VerticalAlignTable.BOTTOM },
         ),
         cell(
-          [para([run(d.total, { size: figureSize, track: -0.03 })], { align: AlignmentType.RIGHT })],
+          [para([run(figure, { size: figureSize, track: -0.03 })], { align: AlignmentType.RIGHT })],
           Math.round(CONTENT * 0.6),
           { borders: { top: line(INK, 8) }, top: 10, align: VerticalAlignTable.BOTTOM },
         ),
@@ -324,10 +333,14 @@ export function buildInvoiceDocx(invoice: Invoice, assets: ExportAssets<DocxImag
         ],
       }),
   );
-  const left: (Paragraph | Table)[] = [
-    ...(inv.showBank && kvRows.length ? [overline("Payment details"), table([56 * TW, leftW - 56 * TW], kvRows)] : []),
-    ...(inv.terms.trim() ? [para([], { before: inv.showBank ? 14 : 0 }), overline("Terms"), para(runs(inv.terms, { color: MUTED }))] : []),
-  ];
+  const notes = inv.notes.trim() ? [overline("Notes"), para(runs(inv.notes, { color: MUTED }))] : [];
+  // A receipt's close holds its notes; the money has arrived, so no bank.
+  const left: (Paragraph | Table)[] = rc
+    ? notes
+    : [
+        ...(inv.showBank && kvRows.length ? [overline("Payment details"), table([56 * TW, leftW - 56 * TW], kvRows)] : []),
+        ...(inv.terms.trim() ? [para([], { before: inv.showBank ? 14 : 0 }), overline("Terms"), para(runs(inv.terms, { color: MUTED }))] : []),
+      ];
   const right: Paragraph[] = inv.showSignature
     ? [
         para([run(`For ${inv.seller.name}`, { color: MUTED })], { align: AlignmentType.RIGHT, after: 4 }),
@@ -349,7 +362,24 @@ export function buildInvoiceDocx(invoice: Invoice, assets: ExportAssets<DocxImag
     }),
   ]);
 
-  const body: (Paragraph | Table)[] = [
+  const receiptBody: (Paragraph | Table)[] = rc
+    ? [
+        masthead,
+        rule(RULE),
+        parties,
+        para([], { before: 12 }),
+        meta,
+        rule(RULE),
+        para(rc.sentence.map((x) => run(x.text, { size: 10, color: x.strong ? INK : SOFT, medium: x.strong }))),
+        ...(ladderRows.length ? [para([], { before: 8 }), ladder] : []),
+        para([], { before: 6 }),
+        grand,
+        para([], { before: 16 }),
+        close,
+      ]
+    : [];
+
+  const body: (Paragraph | Table)[] = rc ? receiptBody : [
     masthead,
     rule(RULE),
     parties,
@@ -373,7 +403,7 @@ export function buildInvoiceDocx(invoice: Invoice, assets: ExportAssets<DocxImag
   return new Document({
     creator: inv.seller.name,
     title: `${d.title} ${inv.number}`,
-    description: `Invoice for ${inv.buyer.name || "client"}`,
+    description: `${rc ? "Payment receipt from" : "Invoice for"} ${inv.buyer.name || "client"}`,
     ...(fonts
       ? {
           // docx types this as Node's Buffer, but only slices and maps the

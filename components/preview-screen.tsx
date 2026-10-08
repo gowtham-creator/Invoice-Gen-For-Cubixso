@@ -55,7 +55,7 @@ export function PreviewScreen({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-desk" role="dialog" aria-modal="true" aria-label="Invoice preview">
+    <div className="fixed inset-0 z-40 flex flex-col bg-desk" role="dialog" aria-modal="true" aria-label={`${invoice.kind === "receipt" ? "Receipt" : "Invoice"} preview`}>
       <header className="flex h-[52px] shrink-0 items-center gap-3 border-b border-line bg-canvas px-4">
         <button
           type="button"
@@ -88,7 +88,7 @@ export function PreviewScreen({
               The invoice could not be drawn: {error}
             </div>
           ) : url ? (
-            <PdfSheet url={url} title="Invoice preview" />
+            <PdfSheet url={url} title={`${invoice.kind === "receipt" ? "Receipt" : "Invoice"} preview`} />
           ) : (
             <div className="flex h-full items-center justify-center">
               <Loader2 size={20} className="animate-spin text-[#9aa0a8]" />

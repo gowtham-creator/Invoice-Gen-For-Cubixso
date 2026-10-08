@@ -34,7 +34,7 @@ export function ExportMenu({
     try {
       await exportInvoice(invoice, format);
       onExported?.(format);
-      toast({ tone: "success", message: `Invoice ${invoice.number} downloaded as ${NAMES[format]}` });
+      toast({ tone: "success", message: `${invoice.kind === "receipt" ? "Receipt" : "Invoice"} ${invoice.number} downloaded as ${NAMES[format]}` });
     } catch (e) {
       toast({ tone: "error", message: `Could not export: ${e instanceof Error ? e.message : String(e)}` });
     } finally {

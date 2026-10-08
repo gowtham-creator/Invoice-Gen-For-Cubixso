@@ -94,8 +94,9 @@ function lineTotals(item: LineItem, inv: Invoice, intraState: boolean): LineTota
   const net = grossMinor - discountMinor;
 
   // A non-GST invoice is a 0% invoice: force the rate rather than trusting the
-  // per-line value, so switching kinds can never leave a stale 18% behind.
-  const rate = inv.kind === "non-gst" ? 0 : clampPercent(item.taxRatePercent);
+  // per-line value, so switching kinds can never leave a stale 18% behind. A
+  // receipt charges nothing either; its lines are never shown.
+  const rate = inv.kind !== "gst" ? 0 : clampPercent(item.taxRatePercent);
 
   let taxableMinor: number;
   let taxMinor: number;
@@ -178,7 +179,7 @@ export function computeTotals(inv: Invoice): InvoiceTotals {
 function bucketByRate(inv: Invoice, lines: LineTotals[]): RateBucket[] {
   const byRate = new Map<number, RateBucket>();
   inv.items.forEach((item, i) => {
-    const rate = inv.kind === "non-gst" ? 0 : clampPercent(item.taxRatePercent);
+    const rate = inv.kind !== "gst" ? 0 : clampPercent(item.taxRatePercent);
     const l = lines[i];
     const b = byRate.get(rate) ?? {
       ratePercent: rate,
@@ -196,4 +197,32 @@ function bucketByRate(inv: Invoice, lines: LineTotals[]): RateBucket[] {
     byRate.set(rate, b);
   });
   return [...byRate.values()].sort((a, b) => a.ratePercent - b.ratePercent);
+}
+
+export interface ReceiptBalance {
+  /** Still owed on the invoice after this receipt. Never negative. Null when
+      there is no invoice total to measure against. */
+  balanceMinor: number | null;
+  /** Received beyond the invoice total, shown as such rather than as a
+      negative balance. */
+  excessMinor: number;
+}
+
+/**
+ * Where an invoice stands once a receipt is counted: what is left to pay, or
+ * how much was paid over. A balance is never printed negative: an overpayment
+ * is a different fact ("received in excess") and reads as one.
+ */
+export function receiptBalance({
+  invoiceTotalMinor,
+  receivedEarlierMinor,
+  amountMinor,
+}: {
+  invoiceTotalMinor: number | null;
+  receivedEarlierMinor: number;
+  amountMinor: number;
+}): ReceiptBalance {
+  if (invoiceTotalMinor === null) return { balanceMinor: null, excessMinor: 0 };
+  const left = invoiceTotalMinor - receivedEarlierMinor - amountMinor;
+  return { balanceMinor: Math.max(0, left), excessMinor: Math.max(0, -left) };
 }

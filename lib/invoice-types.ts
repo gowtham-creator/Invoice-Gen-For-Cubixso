@@ -12,8 +12,36 @@
  * `gst` prints a compliant Indian tax invoice: both GSTINs, place of supply,
  * HSN/SAC per line and a CGST+SGST or IGST ladder.
  * `non-gst` prints a plain bill of supply at 0%.
+ * `receipt` prints a payment receipt: an acknowledgement of money received,
+ * not a bill. It shares the parties, signature and branding, ignores the line
+ * items, and is numbered in its own series (see storage) so that it can never
+ * take a number out of the invoice series, which GST requires be continuous.
  */
-export type InvoiceKind = "gst" | "non-gst";
+export type InvoiceKind = "gst" | "non-gst" | "receipt";
+
+/** How the money arrived. Printed on the receipt as its label. */
+export type PaymentMode = "bank-transfer" | "upi" | "cheque" | "cash" | "card" | "other";
+
+/**
+ * What a receipt says beyond what an invoice already holds. The date received
+ * is the document's `issueDate`; currency, parties, notes, signature, seal and
+ * logo are the invoice's own fields, reused.
+ */
+export interface ReceiptDetails {
+  /** Integer minor units: the amount this receipt acknowledges. */
+  amountMinor: number;
+  mode: PaymentMode;
+  /** UTR, transaction ID or cheque number. */
+  reference: string;
+  /** What the money is for, e.g. "Milestone 2 of 3: backend integration". */
+  purpose: string;
+  /** The invoice number this payment is towards. Empty for an advance. */
+  againstInvoice: string;
+  /** That invoice's grand total, so a balance can be printed. Null: none. */
+  invoiceTotalMinor: number | null;
+  /** The sum of earlier receipts against the same invoice. */
+  receivedEarlierMinor: number;
+}
 
 /**
  * Whether the unit price already contains tax.
@@ -103,4 +131,7 @@ export interface Invoice {
   signatureImage: string | null;
   /** Accent colour for the document, as a hex string. */
   accent: string;
+
+  /** Only on a receipt. Records written before receipts existed have none. */
+  receipt?: ReceiptDetails;
 }

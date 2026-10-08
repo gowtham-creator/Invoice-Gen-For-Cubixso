@@ -12,7 +12,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { computeTotals, isIntraState } from "./invoice-math.ts";
+import { computeTotals, isIntraState, receiptBalance } from "./invoice-math.ts";
 import { blankInvoice, emptyItem } from "./defaults.ts";
 import { amountInWords } from "./amount-in-words.ts";
 import { currencyOf, formatMoney, parseMoney } from "./currency.ts";
@@ -169,4 +169,40 @@ test("multi-letter symbols are spaced, glyphs are flush", () => {
   // across a line break. Written as an escape so this expectation is readable.
   assert.equal(formatMoney(100_00, currencyOf("AED")), "AED\u00a0100.00");
   assert.equal(formatMoney(100_00, currencyOf("USD")), "$100.00");
+});
+
+// Receipts against Invoice #003: ₹2,59,600.00, paid in tranches.
+const INV_003 = 259_600_00;
+
+test("a part-payment leaves the rest as the balance", () => {
+  assert.deepEqual(
+    receiptBalance({ invoiceTotalMinor: INV_003, receivedEarlierMinor: 0, amountMinor: 100_000_00 }),
+    { balanceMinor: 159_600_00, excessMinor: 0 },
+  );
+  assert.deepEqual(
+    receiptBalance({ invoiceTotalMinor: INV_003, receivedEarlierMinor: 100_000_00, amountMinor: 59_600_00 }),
+    { balanceMinor: 100_000_00, excessMinor: 0 },
+    "earlier receipts count",
+  );
+});
+
+test("the final tranche brings the balance to exactly zero", () => {
+  assert.deepEqual(
+    receiptBalance({ invoiceTotalMinor: INV_003, receivedEarlierMinor: 159_600_00, amountMinor: 100_000_00 }),
+    { balanceMinor: 0, excessMinor: 0 },
+  );
+});
+
+test("an overpayment is an excess, never a negative balance", () => {
+  assert.deepEqual(
+    receiptBalance({ invoiceTotalMinor: INV_003, receivedEarlierMinor: 159_600_00, amountMinor: 100_000_50 }),
+    { balanceMinor: 0, excessMinor: 50 },
+  );
+});
+
+test("with no invoice total there is no balance to state", () => {
+  assert.deepEqual(
+    receiptBalance({ invoiceTotalMinor: null, receivedEarlierMinor: 0, amountMinor: 50_000_00 }),
+    { balanceMinor: null, excessMinor: 0 },
+  );
 });

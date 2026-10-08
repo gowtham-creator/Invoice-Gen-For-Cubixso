@@ -26,7 +26,7 @@ import { computeTotals, effectivePlaceOfSupply } from "../lib/invoice-math";
 import { currencyOf, formatMoney } from "../lib/currency";
 import { amountInWords } from "../lib/amount-in-words";
 import { formatPlaceOfSupply, isCustomSignature } from "../lib/defaults";
-import { copyrightLine } from "../lib/export/shared";
+import { copyrightLine, describeReceipt } from "../lib/export/shared";
 import { FONT, PAGE_MARGIN, PALETTES, liftForDark, totalSize, typeFor, type Palette, type Variant } from "./theme";
 
 Font.register({
@@ -118,6 +118,9 @@ function buildStyles(p: Palette) {
   grandValue: { ...TYPE.total, lineHeight: 1 },
 
   words: { ...TYPE.body, marginTop: 16 },
+  /* The receipt's one sentence: body size up a step, the amount in ink. */
+  sentence: { ...TYPE.body, fontSize: 10, lineHeight: 1.6 },
+  sentenceStrong: { color: p.ink, fontWeight: 500 },
   wordsValue: { color: p.ink },
 
   notes: { marginTop: 20 },
@@ -222,6 +225,7 @@ export function InvoiceDocument({
   const signature = isCustomSignature(invoice)
     ? variant === "dark" && darkSignature ? darkSignature : (invoice.signatureImage as string)
     : p.signature;
+  if (invoice.kind === "receipt") return <ReceiptDocument invoice={invoice} variant={variant} signature={signature} />;
   const totalText = formatMoney(t.grandTotalMinor, c);
   const totalSizePt = totalSize(totalText);
   const pos = formatPlaceOfSupply(effectivePlaceOfSupply(invoice));
@@ -251,59 +255,11 @@ export function InvoiceDocument({
       subject={`Invoice for ${invoice.buyer.name || "client"}`}
     >
       <Page size="A4" style={s.page}>
-        {/* Masthead */}
-        <View style={s.masthead}>
-          <View>
-            {invoice.showLogo && (
-              <View style={s.brandRow}>
-                {/* eslint-disable-next-line jsx-a11y/alt-text */}
-                <Image src={p.logo} style={s.logo} />
-                <View>
-                  <Text style={s.wordmark}>{invoice.seller.name.split(" ")[0].toUpperCase()}</Text>
-                  <Text style={s.brandSub}>
-                    {invoice.seller.name.split(" ").slice(1).join(" ").toUpperCase()}
-                  </Text>
-                </View>
-              </View>
-            )}
-          </View>
-          <View>
-            {/* The accent lives on the small title: at 40pt the template sets the
-                total in ink, and a coloured figure that size shouts. */}
-            <Text style={[s.docType, { color: accent }]}>{isGst ? "Tax Invoice" : "Invoice"}</Text>
-            <Text style={s.docNumber}>No. {invoice.number || "—"}</Text>
-          </View>
-        </View>
+        <Masthead invoice={invoice} s={s} p={p} accent={accent} title={isGst ? "Tax Invoice" : "Invoice"} />
 
         <View style={s.rule} />
 
-        {/* Parties */}
-        <View style={s.parties}>
-          <View style={s.party}>
-            <Eyebrow s={s}>From</Eyebrow>
-            <Text style={s.partyName}>{invoice.seller.name}</Text>
-            <Lines text={invoice.seller.address} style={s.partyLine} />
-            {isGst && invoice.seller.gstin ? (
-              <Text style={s.partyTag}>GSTIN {invoice.seller.gstin}</Text>
-            ) : null}
-            {!isGst && invoice.seller.pan ? (
-              <Text style={s.partyTag}>PAN {invoice.seller.pan}</Text>
-            ) : null}
-            {invoice.seller.email ? <Text style={s.partyLine}>{invoice.seller.email}</Text> : null}
-            {invoice.seller.phone ? <Text style={s.partyLine}>{invoice.seller.phone}</Text> : null}
-          </View>
-
-          <View style={s.party}>
-            <Eyebrow s={s}>Billed to</Eyebrow>
-            <Text style={s.partyName}>{invoice.buyer.name || "—"}</Text>
-            <Lines text={invoice.buyer.address} style={s.partyLine} />
-            {isGst && invoice.buyer.gstin ? (
-              <Text style={s.partyTag}>GSTIN {invoice.buyer.gstin}</Text>
-            ) : null}
-            {invoice.buyer.email ? <Text style={s.partyLine}>{invoice.buyer.email}</Text> : null}
-            {invoice.buyer.phone ? <Text style={s.partyLine}>{invoice.buyer.phone}</Text> : null}
-          </View>
-        </View>
+        <Parties invoice={invoice} s={s} taxed={isGst} buyerLabel="Billed to" />
 
         {/* Meta */}
         <View style={s.metaRow}>
@@ -497,52 +453,220 @@ export function InvoiceDocument({
             )}
           </View>
 
-          {invoice.showSignature && (
-            <View style={s.signBlock}>
-              {/* The conventional Indian sign-off: the company the signatory
-                  acts for above the signature, the capacity below it, and the
-                  company seal beneath that. */}
-              <Text style={s.signFor}>For {invoice.seller.name}</Text>
-              {/* Always an image: signatureSrc falls back to the built-in
-                  signature, so no saved draft can leave this line blank. */}
-              {/* eslint-disable-next-line jsx-a11y/alt-text */}
-              <Image src={signature} style={s.signImage} />
-              <View style={s.signRule}>
-                <Text style={s.signName}>{invoice.signatoryName || invoice.seller.name}</Text>
-                <Text style={s.signRole}>Authorised Signatory</Text>
-              </View>
-              {invoice.showStamp && (
-                /* eslint-disable-next-line jsx-a11y/alt-text */
-                <Image src={p.seal} style={s.seal} />
-              )}
-            </View>
-          )}
+          <SignBlock invoice={invoice} s={s} p={p} signature={signature} />
         </View>
 
-        {/* One fixed Text, absolutely positioned against the page, repeated on
-            every page. The original footer, a flex-row View holding two Texts,
-            never rendered, which silently dropped the non-GST disclaimer from
-            every PDF. A "page X of Y" counter was dropped too: react-pdf's
-            `render` Text would not draw in any position tried. The invoice
-            number is written in statically instead, so a loose second page can
-            still be matched to its invoice. */}
-        <View style={s.footerRule} fixed />
-        <Text style={s.footer} fixed>
-          {`No. ${invoice.number || "—"} · All amounts in ${c.code} · ${
+        <PageFooter
+          invoice={invoice}
+          s={s}
+          p={p}
+          text={`No. ${invoice.number || "—"} · All amounts in ${c.code} · ${
             isGst
               ? "This is a computer-generated tax invoice."
               : "Not a tax invoice. GST is not charged (0%)."
           }`}
-        </Text>
-        {invoice.showLogo && (
-          /* eslint-disable-next-line jsx-a11y/alt-text */
-          <Image src={p.logo} style={s.badge} fixed />
-        )}
-        <Text style={invoice.showLogo ? [s.copyright, s.copyrightBesideBadge] : s.copyright} fixed>
-          {copyrightLine(invoice)}
-        </Text>
+        />
       </Page>
     </Document>
+  );
+}
+
+/**
+ * A payment receipt: the same paper as the invoice (masthead, parties,
+ * signature and seal, footer), with the line items replaced by the sentence
+ * that acknowledges the money, where the invoice now stands, and the amount.
+ * No payment details: the payment has been made.
+ */
+function ReceiptDocument({ invoice, variant, signature }: { invoice: Invoice; variant: Variant; signature: string }) {
+  const s = STYLES[variant];
+  const p = PALETTES[variant];
+  const d = describeReceipt(invoice);
+  const baseAccent = invoice.accent || "#0066cc";
+  const accent = variant === "dark" ? liftForDark(baseAccent) : baseAccent;
+  const amountSizePt = totalSize(d.amount);
+
+  return (
+    <Document
+      title={`${d.title} ${invoice.number} — ${invoice.seller.name}`}
+      author={invoice.seller.name}
+      subject={`Payment receipt from ${invoice.buyer.name || "client"}`}
+    >
+      <Page size="A4" style={s.page}>
+        <Masthead invoice={invoice} s={s} p={p} accent={accent} title={d.title} />
+
+        <View style={s.rule} />
+
+        <Parties invoice={invoice} s={s} taxed buyerLabel="Received from" />
+
+        <View style={s.metaRow}>
+          {d.meta.map(([k, v]) => (
+            <View key={k} style={s.metaCell}>
+              <Eyebrow s={s}>{k}</Eyebrow>
+              <Text style={s.metaValue}>{v}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={s.rule} />
+
+        <Text style={s.sentence}>
+          {d.sentence.map((x, i) =>
+            x.strong ? (
+              <Text key={i} style={s.sentenceStrong}>
+                {x.text}
+              </Text>
+            ) : (
+              x.text
+            ),
+          )}
+        </Text>
+
+        {d.ladder.length > 0 && (
+          <View style={s.totalsWrap} wrap={false}>
+            <View style={s.totals}>
+              {d.ladder.map((r) => (
+                <Row key={r.label} s={s} label={r.label} value={r.value} />
+              ))}
+            </View>
+          </View>
+        )}
+
+        <View style={s.grand} wrap={false}>
+          <Text style={s.grandLabel}>Amount received</Text>
+          <Text style={[s.grandValue, { fontSize: amountSizePt, letterSpacing: amountSizePt * -0.03 }]}>
+            {d.amount}
+          </Text>
+        </View>
+
+        {/* Notes on the left where an invoice keeps its bank and terms; the
+            signature and seal on the right, exactly as an invoice signs. */}
+        <View style={s.close} wrap={false}>
+          <View style={s.closeLeft}>
+            {invoice.notes.trim() !== "" && (
+              <View>
+                <Eyebrow s={s}>Notes</Eyebrow>
+                <Lines text={invoice.notes} style={s.body} />
+              </View>
+            )}
+          </View>
+          <SignBlock invoice={invoice} s={s} p={p} signature={signature} />
+        </View>
+
+        <PageFooter invoice={invoice} s={s} p={p} text={d.footer} />
+      </Page>
+    </Document>
+  );
+}
+
+function Masthead({ invoice, s, p, accent, title }: { invoice: Invoice; s: Styles; p: Palette; accent: string; title: string }) {
+  return (
+    <View style={s.masthead}>
+      <View>
+        {invoice.showLogo && (
+          <View style={s.brandRow}>
+            {/* eslint-disable-next-line jsx-a11y/alt-text */}
+            <Image src={p.logo} style={s.logo} />
+            <View>
+              <Text style={s.wordmark}>{invoice.seller.name.split(" ")[0].toUpperCase()}</Text>
+              <Text style={s.brandSub}>
+                {invoice.seller.name.split(" ").slice(1).join(" ").toUpperCase()}
+              </Text>
+            </View>
+          </View>
+        )}
+      </View>
+      <View>
+        {/* The accent lives on the small title: at 40pt the template sets the
+            total in ink, and a coloured figure that size shouts. */}
+        <Text style={[s.docType, { color: accent }]}>{title}</Text>
+        <Text style={s.docNumber}>No. {invoice.number || "—"}</Text>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * From and to. `taxed` prints GSTINs (a tax invoice, or a receipt from the
+ * same registered business); otherwise the seller is identified by PAN.
+ */
+function Parties({ invoice, s, taxed, buyerLabel }: { invoice: Invoice; s: Styles; taxed: boolean; buyerLabel: string }) {
+  return (
+    <View style={s.parties}>
+      <View style={s.party}>
+        <Eyebrow s={s}>From</Eyebrow>
+        <Text style={s.partyName}>{invoice.seller.name}</Text>
+        <Lines text={invoice.seller.address} style={s.partyLine} />
+        {taxed && invoice.seller.gstin ? (
+          <Text style={s.partyTag}>GSTIN {invoice.seller.gstin}</Text>
+        ) : null}
+        {!taxed && invoice.seller.pan ? (
+          <Text style={s.partyTag}>PAN {invoice.seller.pan}</Text>
+        ) : null}
+        {invoice.seller.email ? <Text style={s.partyLine}>{invoice.seller.email}</Text> : null}
+        {invoice.seller.phone ? <Text style={s.partyLine}>{invoice.seller.phone}</Text> : null}
+      </View>
+
+      <View style={s.party}>
+        <Eyebrow s={s}>{buyerLabel}</Eyebrow>
+        <Text style={s.partyName}>{invoice.buyer.name || "—"}</Text>
+        <Lines text={invoice.buyer.address} style={s.partyLine} />
+        {taxed && invoice.buyer.gstin ? (
+          <Text style={s.partyTag}>GSTIN {invoice.buyer.gstin}</Text>
+        ) : null}
+        {invoice.buyer.email ? <Text style={s.partyLine}>{invoice.buyer.email}</Text> : null}
+        {invoice.buyer.phone ? <Text style={s.partyLine}>{invoice.buyer.phone}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
+function SignBlock({ invoice, s, p, signature }: { invoice: Invoice; s: Styles; p: Palette; signature: string }) {
+  if (!invoice.showSignature) return null;
+  return (
+    <View style={s.signBlock}>
+      {/* The conventional Indian sign-off: the company the signatory
+          acts for above the signature, the capacity below it, and the
+          company seal beneath that. */}
+      <Text style={s.signFor}>For {invoice.seller.name}</Text>
+      {/* Always an image: signatureSrc falls back to the built-in
+          signature, so no saved draft can leave this line blank. */}
+      {/* eslint-disable-next-line jsx-a11y/alt-text */}
+      <Image src={signature} style={s.signImage} />
+      <View style={s.signRule}>
+        <Text style={s.signName}>{invoice.signatoryName || invoice.seller.name}</Text>
+        <Text style={s.signRole}>Authorised Signatory</Text>
+      </View>
+      {invoice.showStamp && (
+        /* eslint-disable-next-line jsx-a11y/alt-text */
+        <Image src={p.seal} style={s.seal} />
+      )}
+    </View>
+  );
+}
+
+/**
+ * One fixed Text, absolutely positioned against the page, repeated on every
+ * page. The original footer, a flex-row View holding two Texts, never
+ * rendered, which silently dropped the non-GST disclaimer from every PDF. A
+ * "page X of Y" counter was dropped too: react-pdf's `render` Text would not
+ * draw in any position tried. The document number is written in statically
+ * instead, so a loose second page can still be matched to its document.
+ */
+function PageFooter({ invoice, s, p, text }: { invoice: Invoice; s: Styles; p: Palette; text: string }) {
+  return (
+    <>
+      <View style={s.footerRule} fixed />
+      <Text style={s.footer} fixed>
+        {text}
+      </Text>
+      {invoice.showLogo && (
+        /* eslint-disable-next-line jsx-a11y/alt-text */
+        <Image src={p.logo} style={s.badge} fixed />
+      )}
+      <Text style={invoice.showLogo ? [s.copyright, s.copyrightBesideBadge] : s.copyright} fixed>
+        {copyrightLine(invoice)}
+      </Text>
+    </>
   );
 }
 

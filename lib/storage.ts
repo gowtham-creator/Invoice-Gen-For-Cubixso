@@ -18,7 +18,8 @@
  */
 
 import type { Invoice } from "./invoice-types";
-import { CUBIXSO_SELLER, RETIRED_SELLER_PHONES, blankInvoice, newId } from "./defaults";
+import { CUBIXSO_SELLER, RETIRED_SELLER_PHONES, blankInvoice, newId, receiptOf } from "./defaults";
+import { computeTotals } from "./invoice-math";
 
 const RECORDS_KEY = "cubixso.invoices.v2";
 
@@ -52,6 +53,8 @@ function reconcile(stored: unknown): Invoice {
     buyer: { ...base.buyer, ...(s.buyer ?? {}) },
     bank: { ...base.bank, ...(s.bank ?? {}) },
     items: Array.isArray(s.items) && s.items.length > 0 ? s.items : base.items,
+    // Only a receipt carries receipt details, filled out to the current shape.
+    receipt: s.kind === "receipt" ? receiptOf(s) : undefined,
   };
 }
 
@@ -181,9 +184,10 @@ export function restoreInvoice(record: InvoiceRecord): InvoiceRecord[] {
 }
 
 /**
- * Starts a new invoice. What belongs to the business rather than the client
- * (who bills, from where, into which account, how it is signed) carries over
- * from the most recent invoice; the number follows on from the highest.
+ * Starts a new invoice, or a new receipt. What belongs to the business rather
+ * than the client (who bills, from where, into which account, how it is
+ * signed) carries over from the most recent document; the number follows on
+ * from the highest in its own series.
  */
 export function createInvoice(kind: Invoice["kind"]): InvoiceRecord {
   const records = listInvoices();
@@ -191,7 +195,7 @@ export function createInvoice(kind: Invoice["kind"]): InvoiceRecord {
   const fresh = blankInvoice(kind);
   const invoice: Invoice = {
     ...fresh,
-    number: nextInvoiceNumber(records),
+    number: nextNumberFor(kind, records),
     ...(last
       ? {
           seller: last.seller,
@@ -210,18 +214,28 @@ export function createInvoice(kind: Invoice["kind"]): InvoiceRecord {
   return record;
 }
 
-/** A copy under the next number, as a fresh draft: the usual start for a repeat bill. */
+/**
+ * A copy under the next number in its own series, as a fresh draft: the usual
+ * start for a repeat bill, or for the next tranche of a payment. A receipt's
+ * copy counts its source as received earlier, so its balance stays true.
+ */
 export function duplicateInvoice(id: string): InvoiceRecord | null {
   const records = listInvoices();
   const source = records.find((r) => r.id === id);
   if (!source) return null;
+  const src = source.invoice;
   const now = new Date().toISOString();
+  const receipt = src.kind === "receipt" ? receiptOf(src) : undefined;
   const record: InvoiceRecord = {
     id: newId(),
     invoice: {
-      ...source.invoice,
-      number: nextInvoiceNumber(records),
-      items: source.invoice.items.map((i) => ({ ...i, id: newId() })),
+      ...src,
+      number: nextNumberFor(src.kind, records),
+      items: src.items.map((i) => ({ ...i, id: newId() })),
+      receipt:
+        receipt && receipt.againstInvoice.trim()
+          ? { ...receipt, receivedEarlierMinor: receivedAgainst(records, receipt.againstInvoice, src.currencyCode) }
+          : receipt,
     },
     createdAt: now,
     updatedAt: now,
@@ -232,17 +246,91 @@ export function duplicateInvoice(id: string): InvoiceRecord | null {
 }
 
 /**
+ * Issues a receipt for an invoice: a new receipt for the same client, in the
+ * same currency, signed and branded the same way, against that invoice's
+ * number and total. The amount starts at what is still owed after earlier
+ * receipts, which is right for a final payment and is edited down for a
+ * part-payment. Only invoices take receipts; a receipt for a receipt is null.
+ */
+export function createReceiptFor(invoiceId: string): InvoiceRecord | null {
+  const records = listInvoices();
+  const source = records.find((r) => r.id === invoiceId)?.invoice;
+  if (!source || source.kind === "receipt") return null;
+  const totalMinor = computeTotals(source).grandTotalMinor;
+  const earlier = receivedAgainst(records, source.number, source.currencyCode);
+  const fresh = blankInvoice("receipt");
+  const invoice: Invoice = {
+    ...fresh,
+    number: nextReceiptNumber(records),
+    currencyCode: source.currencyCode,
+    seller: source.seller,
+    buyer: source.buyer,
+    bank: source.bank,
+    terms: source.terms,
+    accent: source.accent,
+    showLogo: source.showLogo,
+    showSignature: source.showSignature,
+    showStamp: source.showStamp,
+    signatoryName: source.signatoryName,
+    signatureImage: source.signatureImage,
+    receipt: {
+      ...receiptOf(fresh),
+      againstInvoice: source.number.trim(),
+      invoiceTotalMinor: totalMinor,
+      receivedEarlierMinor: earlier,
+      amountMinor: Math.max(0, totalMinor - earlier),
+    },
+  };
+  const now = new Date().toISOString();
+  const record: InvoiceRecord = { id: newId(), invoice, createdAt: now, updatedAt: now, exportedAt: null };
+  write([record, ...records]);
+  return record;
+}
+
+/**
+ * Everything received against one invoice number in one currency: the sum of
+ * the receipts that name it. Amounts in another currency are not added in, for
+ * the same reason the home screen never adds dollars to rupees.
+ */
+export function receivedAgainst(records: InvoiceRecord[], invoiceNumber: string, currencyCode: string): number {
+  const number = invoiceNumber.trim();
+  if (!number) return 0;
+  return records
+    .filter((r) => r.invoice.kind === "receipt" && r.invoice.currencyCode === currencyCode)
+    .map((r) => receiptOf(r.invoice))
+    .filter((rc) => rc.againstInvoice.trim() === number)
+    .reduce((sum, rc) => sum + rc.amountMinor, 0);
+}
+
+function nextNumberFor(kind: Invoice["kind"], records: InvoiceRecord[]): string {
+  return kind === "receipt" ? nextReceiptNumber(records) : nextInvoiceNumber(records);
+}
+
+/**
  * The next invoice number: one more than the highest already used, keeping the
  * prefix and zero-padding the user established. "CBX-007" becomes "CBX-008";
  * "003" becomes "004".
+ *
+ * Receipts are left out entirely. GST requires the invoice series to run
+ * without gaps, so a receipt must never take, or move on, an invoice number.
+ * Tax invoices and invoices without GST still share the one series.
  */
 export function nextInvoiceNumber(records: InvoiceRecord[]): string {
+  return nextInSeries(records.filter((r) => r.invoice.kind !== "receipt"), "001");
+}
+
+/** The next receipt number, in the receipts' own series: "R-001", "R-002", … */
+export function nextReceiptNumber(records: InvoiceRecord[]): string {
+  return nextInSeries(records.filter((r) => r.invoice.kind === "receipt"), "R-001");
+}
+
+function nextInSeries(records: InvoiceRecord[], first: string): string {
   const parsed = records
     .map((r) => /^(.*?)(\d+)$/.exec(r.invoice.number.trim()))
     .filter((m): m is RegExpExecArray => m !== null)
     .map((m) => ({ prefix: m[1], digits: m[2], n: Number(m[2]) }))
     .filter((p) => Number.isFinite(p.n));
-  if (parsed.length === 0) return "001";
+  if (parsed.length === 0) return first;
   const top = parsed.reduce((a, b) => (b.n > a.n ? b : a));
   return `${top.prefix}${String(top.n + 1).padStart(top.digits.length, "0")}`;
 }

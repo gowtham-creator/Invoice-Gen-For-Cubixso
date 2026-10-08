@@ -117,7 +117,7 @@ export function Preview({ invoice }: { invoice: Invoice }) {
                 The invoice could not be drawn: {error}
               </div>
             ) : shown ? (
-              <PdfSheet url={shown.url} title="Invoice" />
+              <PdfSheet url={shown.url} title={invoice.kind === "receipt" ? "Receipt" : "Invoice"} />
             ) : (
               <SheetSkeleton />
             )}

@@ -24,6 +24,7 @@ import {
   Button, Disclosure, Field, Group, Label, Row, Segmented, Select, Switch, TextArea,
 } from "./controls";
 import { LineItemsEditor } from "./line-items";
+import { AgainstInvoiceGroup, ReceiptGroup } from "./receipt-fields";
 
 const ACCENTS = [
   { name: "Cubixso blue", hex: "#0066cc" },
@@ -47,6 +48,11 @@ export function Editor({
   set: (patch: Partial<Invoice>) => void;
 }) {
   const isGst = invoice.kind === "gst";
+  // A receipt keeps the parties, notes, signature and appearance, and swaps
+  // everything about billing (items, GST, round-off, terms, bank) for what
+  // was received. It prints both GSTINs, so the client's GSTIN is asked for.
+  const isReceipt = invoice.kind === "receipt";
+  const taxed = isGst || isReceipt;
   const c = currencyOf(invoice.currencyCode);
   const totals = computeTotals(invoice);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -78,75 +84,81 @@ export function Editor({
 
   return (
     <div>
-      <Group title="Invoice">
-        <div className="space-y-4">
-          <Segmented
-            value={invoice.kind}
-            onChange={(kind) =>
-              set({
-                kind,
-                // Switching to a non-GST invoice must actually zero the rates,
-                // not just hide them, or the totals would still carry tax the
-                // printed invoice does not show.
-                items: invoice.items.map((i) => ({
-                  ...i,
-                  taxRatePercent: kind === "non-gst" ? 0 : i.taxRatePercent || 18,
-                })),
-              })
-            }
-            options={[
-              { value: "gst", label: "Tax invoice" },
-              { value: "non-gst", label: "Invoice, no GST" },
-            ]}
-            hint={
-              isGst
-                ? "Both GSTINs, place of supply, and CGST + SGST or IGST."
-                : "GST at 0%. No tax breakdown and no GSTIN needed."
-            }
-          />
-
-          <Row cols={3}>
-            <Field label="Invoice no." value={invoice.number} onChange={(number) => set({ number })} mono />
-            <Field label="Issue date" type="date" value={invoice.issueDate} onChange={(issueDate) => set({ issueDate })} />
-            <Field label="Due date" type="date" value={invoice.dueDate} onChange={(dueDate) => set({ dueDate })} />
-          </Row>
-
-          <Row cols={isGst ? 2 : 1}>
-            <Select
-              label="Currency"
-              value={invoice.currencyCode}
-              onChange={(currencyCode) => set({ currencyCode })}
-              options={CURRENCIES.map((x) => ({ value: x.code, label: `${x.code} · ${x.name}` }))}
+      {isReceipt ? (
+        <ReceiptGroup invoice={invoice} set={set} />
+      ) : (
+        <Group title="Invoice">
+          <div className="space-y-4">
+            <Segmented
+              value={invoice.kind}
+              onChange={(kind) =>
+                set({
+                  kind,
+                  // Switching to a non-GST invoice must actually zero the rates,
+                  // not just hide them, or the totals would still carry tax the
+                  // printed invoice does not show.
+                  items: invoice.items.map((i) => ({
+                    ...i,
+                    taxRatePercent: kind === "non-gst" ? 0 : i.taxRatePercent || 18,
+                  })),
+                })
+              }
+              options={[
+                // Never "receipt": receipts and invoices are numbered in
+                // separate series, so one cannot become the other.
+                { value: "gst", label: "Tax invoice" },
+                { value: "non-gst", label: "Invoice, no GST" },
+              ] as { value: Invoice["kind"]; label: string }[]}
+              hint={
+                isGst
+                  ? "Both GSTINs, place of supply, and CGST + SGST or IGST."
+                  : "GST at 0%. No tax breakdown and no GSTIN needed."
+              }
             />
-            {isGst && (
-              <Segmented
-                label="Prices"
-                value={invoice.taxMode}
-                onChange={(taxMode) => set({ taxMode })}
-                options={[
-                  { value: "exclusive", label: "Excl. GST" },
-                  { value: "inclusive", label: "Incl. GST" },
-                ]}
+
+            <Row cols={3}>
+              <Field label="Invoice no." value={invoice.number} onChange={(number) => set({ number })} mono />
+              <Field label="Issue date" type="date" value={invoice.issueDate} onChange={(issueDate) => set({ issueDate })} />
+              <Field label="Due date" type="date" value={invoice.dueDate} onChange={(dueDate) => set({ dueDate })} />
+            </Row>
+
+            <Row cols={isGst ? 2 : 1}>
+              <Select
+                label="Currency"
+                value={invoice.currencyCode}
+                onChange={(currencyCode) => set({ currencyCode })}
+                options={CURRENCIES.map((x) => ({ value: x.code, label: `${x.code} · ${x.name}` }))}
               />
-            )}
-          </Row>
+              {isGst && (
+                <Segmented
+                  label="Prices"
+                  value={invoice.taxMode}
+                  onChange={(taxMode) => set({ taxMode })}
+                  options={[
+                    { value: "exclusive", label: "Excl. GST" },
+                    { value: "inclusive", label: "Incl. GST" },
+                  ]}
+                />
+              )}
+            </Row>
 
-          {isGst && c.code !== "INR" ? (
-            <p className="rounded-md bg-accent-soft px-3 py-2 text-[12px] leading-relaxed text-ink-2">
-              Billing in {c.code} on a tax invoice. Exports of services are normally zero-rated;
-              if this is an export, switch to <span className="font-medium text-ink">Invoice, no GST</span>.
-            </p>
-          ) : null}
+            {isGst && c.code !== "INR" ? (
+              <p className="rounded-md bg-accent-soft px-3 py-2 text-[12px] leading-relaxed text-ink-2">
+                Billing in {c.code} on a tax invoice. Exports of services are normally zero-rated;
+                if this is an export, switch to <span className="font-medium text-ink">Invoice, no GST</span>.
+              </p>
+            ) : null}
 
-          <Switch
-            label={`Round the total to the nearest ${c.symbol}1`}
-            checked={invoice.roundOff}
-            onChange={(roundOff) => set({ roundOff })}
-          />
-        </div>
-      </Group>
+            <Switch
+              label={`Round the total to the nearest ${c.symbol}1`}
+              checked={invoice.roundOff}
+              onChange={(roundOff) => set({ roundOff })}
+            />
+          </div>
+        </Group>
+      )}
 
-      <Group title="Bill to">
+      <Group title={isReceipt ? "Received from" : "Bill to"}>
         <div className="space-y-3">
           <Field label="Client" value={invoice.buyer.name} onChange={(name) => setParty("buyer", { name })} placeholder="Acme Private Limited" />
           <TextArea
@@ -158,7 +170,7 @@ export function Editor({
           />
           <Row>
             <Select label="State" value={invoice.buyer.state} onChange={(state) => setParty("buyer", { state })} options={stateOptions} />
-            {isGst ? (
+            {taxed ? (
               <Field label="GSTIN" value={invoice.buyer.gstin} onChange={(gstin) => setParty("buyer", { gstin })} mono placeholder="36AAAAA0000A1Z5" />
             ) : (
               <Field label="PAN" value={invoice.buyer.pan} onChange={(pan) => setParty("buyer", { pan })} mono />
@@ -184,13 +196,17 @@ export function Editor({
         </div>
       </Group>
 
-      <Group title="Items">
-        <LineItemsEditor invoice={invoice} onChange={(items) => set({ items })} />
-      </Group>
+      {isReceipt ? (
+        <AgainstInvoiceGroup invoice={invoice} set={set} />
+      ) : (
+        <Group title="Items">
+          <LineItemsEditor invoice={invoice} onChange={(items) => set({ items })} />
+        </Group>
+      )}
 
       <Group title="Notes">
         <TextArea
-          label="Printed under the totals, exactly as typed"
+          label={isReceipt ? "Printed beside the signature, exactly as typed" : "Printed under the totals, exactly as typed"}
           rows={4}
           value={invoice.notes}
           onChange={(notes) => set({ notes })}
@@ -198,51 +214,56 @@ export function Editor({
         />
       </Group>
 
-      <Disclosure
-        title="Payment"
-        summary={invoice.showBank ? `${invoice.bank.bankName} ${lastFour(invoice.bank.accountNumber)}` : "Hidden"}
-      >
-        <div className="space-y-3">
-          <Switch label="Show payment details" checked={invoice.showBank} onChange={(showBank) => set({ showBank })} />
-          {invoice.showBank && (
-            <>
-              <Select
-                label="Account"
-                value={profileIndex >= 0 ? String(profileIndex) : "custom"}
-                onChange={(v) => {
-                  if (v !== "custom") set({ bank: { ...BANK_PROFILES[Number(v)] } });
-                }}
-                options={[
-                  ...BANK_PROFILES.map((p, i) => ({ value: String(i), label: p.label })),
-                  ...(profileIndex < 0 ? [{ value: "custom", label: "Custom (edited below)" }] : []),
-                ]}
-              />
-              <Field label="Payee" value={invoice.bank.payeeName} onChange={(payeeName) => setBank({ payeeName })} />
-              <Row>
-                <Field label="Account no." value={invoice.bank.accountNumber} onChange={(accountNumber) => setBank({ accountNumber })} mono />
-                <Field label="Account type" value={invoice.bank.accountType} onChange={(accountType) => setBank({ accountType })} />
-              </Row>
-              <Row>
-                <Field label="Bank" value={invoice.bank.bankName} onChange={(bankName) => setBank({ bankName })} />
-                <Field label="IFSC" value={invoice.bank.ifsc} onChange={(ifsc) => setBank({ ifsc })} mono />
-              </Row>
-              <Field label="Branch" value={invoice.bank.branch} onChange={(branch) => setBank({ branch })} />
-              <Row>
-                <Field label="SWIFT" value={invoice.bank.swift} onChange={(swift) => setBank({ swift })} mono hint="For payments from abroad." />
-                <Field label="UPI ID" value={invoice.bank.upi} onChange={(upi) => setBank({ upi })} mono />
-              </Row>
-            </>
-          )}
-        </div>
-      </Disclosure>
+      {!isReceipt && (
+        <Disclosure
+          title="Payment"
+          summary={invoice.showBank ? `${invoice.bank.bankName} ${lastFour(invoice.bank.accountNumber)}` : "Hidden"}
+        >
+          <div className="space-y-3">
+            <Switch label="Show payment details" checked={invoice.showBank} onChange={(showBank) => set({ showBank })} />
+            {invoice.showBank && (
+              <>
+                <Select
+                  label="Account"
+                  value={profileIndex >= 0 ? String(profileIndex) : "custom"}
+                  onChange={(v) => {
+                    if (v !== "custom") set({ bank: { ...BANK_PROFILES[Number(v)] } });
+                  }}
+                  options={[
+                    ...BANK_PROFILES.map((p, i) => ({ value: String(i), label: p.label })),
+                    ...(profileIndex < 0 ? [{ value: "custom", label: "Custom (edited below)" }] : []),
+                  ]}
+                />
+                <Field label="Payee" value={invoice.bank.payeeName} onChange={(payeeName) => setBank({ payeeName })} />
+                <Row>
+                  <Field label="Account no." value={invoice.bank.accountNumber} onChange={(accountNumber) => setBank({ accountNumber })} mono />
+                  <Field label="Account type" value={invoice.bank.accountType} onChange={(accountType) => setBank({ accountType })} />
+                </Row>
+                <Row>
+                  <Field label="Bank" value={invoice.bank.bankName} onChange={(bankName) => setBank({ bankName })} />
+                  <Field label="IFSC" value={invoice.bank.ifsc} onChange={(ifsc) => setBank({ ifsc })} mono />
+                </Row>
+                <Field label="Branch" value={invoice.bank.branch} onChange={(branch) => setBank({ branch })} />
+                <Row>
+                  <Field label="SWIFT" value={invoice.bank.swift} onChange={(swift) => setBank({ swift })} mono hint="For payments from abroad." />
+                  <Field label="UPI ID" value={invoice.bank.upi} onChange={(upi) => setBank({ upi })} mono />
+                </Row>
+              </>
+            )}
+          </div>
+        </Disclosure>
 
-      <Disclosure title="Terms" summary={invoice.terms.split("\n")[0] || "None"}>
-        <TextArea label="Terms and conditions" rows={4} value={invoice.terms} onChange={(terms) => set({ terms })} />
-      </Disclosure>
+      )}
+
+      {!isReceipt && (
+        <Disclosure title="Terms" summary={invoice.terms.split("\n")[0] || "None"}>
+          <TextArea label="Terms and conditions" rows={4} value={invoice.terms} onChange={(terms) => set({ terms })} />
+        </Disclosure>
+      )}
 
       <Disclosure
         title="Your details"
-        summary={isGst && invoice.seller.gstin ? `GSTIN ${invoice.seller.gstin}` : invoice.seller.name}
+        summary={taxed && invoice.seller.gstin ? `GSTIN ${invoice.seller.gstin}` : invoice.seller.name}
       >
         <div className="space-y-3">
           <Field label="Company" value={invoice.seller.name} onChange={(name) => setParty("seller", { name })} />
@@ -330,7 +351,9 @@ export function Editor({
         <div className="space-y-4">
           <div>
             <Label>Accent colour</Label>
-            <p className="-mt-1 mb-2.5 text-[12px] text-ink-3">Used for the “Tax invoice” title.</p>
+            <p className="-mt-1 mb-2.5 text-[12px] text-ink-3">
+              Used for the “{isReceipt ? "Payment receipt" : "Tax invoice"}” title.
+            </p>
             <div className="flex flex-wrap items-center gap-2.5">
               {ACCENTS.map((a) => {
                 const active = invoice.accent === a.hex;
@@ -370,7 +393,10 @@ export function Editor({
           </div>
           <div>
             <Switch label="Show logo" checked={invoice.showLogo} onChange={(showLogo) => set({ showLogo })} />
-            <Switch label="Show amount in words" checked={invoice.showAmountInWords} onChange={(showAmountInWords) => set({ showAmountInWords })} />
+            {/* A receipt always states the amount in words, in its sentence. */}
+            {!isReceipt && (
+              <Switch label="Show amount in words" checked={invoice.showAmountInWords} onChange={(showAmountInWords) => set({ showAmountInWords })} />
+            )}
           </div>
         </div>
       </Disclosure>

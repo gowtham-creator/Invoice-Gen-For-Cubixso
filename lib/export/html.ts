@@ -43,15 +43,21 @@ export function invoiceToHtml(invoice: Invoice, assets: ExportAssets<string>): s
         ${p.phone ? `<p class="body">${escapeHtml(p.phone)}</p>` : ""}
       </div>`;
 
-  const sellerTax = d.isGst ? (inv.seller.gstin ? `GSTIN ${inv.seller.gstin}` : "") : inv.seller.pan ? `PAN ${inv.seller.pan}` : "";
-  const buyerTax = d.isGst && inv.buyer.gstin ? `GSTIN ${inv.buyer.gstin}` : "";
+  const rc = d.receipt;
+  // A receipt names both parties' GSTINs when it has them, like a tax invoice:
+  // it is the same business acknowledging the same client.
+  const taxed = d.isGst || !!rc;
+  const sellerTax = taxed ? (inv.seller.gstin ? `GSTIN ${inv.seller.gstin}` : "") : inv.seller.pan ? `PAN ${inv.seller.pan}` : "";
+  const buyerTax = taxed && inv.buyer.gstin ? `GSTIN ${inv.buyer.gstin}` : "";
 
-  const meta = [
-    ["Issue date", fmtDate(inv.issueDate)],
-    ["Due date", fmtDate(inv.dueDate)],
-    ...(d.isGst ? [["Place of supply", d.placeOfSupply]] : []),
-    ["Currency", `${d.c.code} · ${d.c.name}`],
-  ];
+  const meta = rc
+    ? rc.meta
+    : [
+        ["Issue date", fmtDate(inv.issueDate)],
+        ["Due date", fmtDate(inv.dueDate)],
+        ...(d.isGst ? [["Place of supply", d.placeOfSupply]] : []),
+        ["Currency", `${d.c.code} · ${d.c.name}`],
+      ];
 
   const head = `
         <tr>
@@ -79,7 +85,7 @@ export function invoiceToHtml(invoice: Invoice, assets: ExportAssets<string>): s
     )
     .join("");
 
-  const ladder = d.ladder
+  const ladder = (rc ? rc.ladder : d.ladder)
     .map((r) => `<div class="ladder-row"><span class="soft">${escapeHtml(r.label)}</span><span>${escapeHtml(r.value)}</span></div>`)
     .join("");
 
@@ -107,6 +113,7 @@ export function invoiceToHtml(invoice: Invoice, assets: ExportAssets<string>): s
         .join("")}</dl></div>`
     : "";
   const terms = inv.terms.trim() ? `<div class="terms"><p class="overline">Terms</p><p class="body">${lines(inv.terms)}</p></div>` : "";
+  const notes = inv.notes.trim() ? `<section class="notes"><p class="overline">Notes</p><p class="body">${lines(inv.notes)}</p></section>` : "";
 
   const signature = inv.showSignature
     ? `
@@ -120,6 +127,56 @@ export function invoiceToHtml(invoice: Invoice, assets: ExportAssets<string>): s
           ${inv.showStamp ? `<img class="seal" src="${escapeHtml(assets.seal)}" alt="Company seal">` : ""}
         </div>`
     : "";
+
+  // A receipt: the sentence that acknowledges the payment, where the invoice
+  // stands, the amount, then notes beside the signature. No bank details:
+  // the money has arrived.
+  const receiptBody = rc
+    ? `
+    <p class="receipt-sentence">${rc.sentence
+      .map((x) => (x.strong ? `<strong>${escapeHtml(x.text)}</strong>` : escapeHtml(x.text)))
+      .join("")}</p>
+
+    ${ladder ? `<div class="ladder">${ladder}</div>` : ""}
+
+    <section class="grand">
+      <div><p class="label">Amount received</p></div>
+      <p class="figure">${escapeHtml(rc.amount)}</p>
+    </section>
+
+    <section class="close">
+      <div>${notes.replace('class="notes"', 'class="notes flush"')}</div>
+      ${signature}
+    </section>
+`
+    : "";
+
+  const invoiceBody = `
+    <table class="items">
+      ${head}
+      ${rows}
+    </table>
+
+    <div class="ladder">${ladder}</div>
+
+    <section class="grand">
+      <div>
+        <p class="label">Total due</p>
+        ${d.payableBy ? `<p class="payable">${escapeHtml(d.payableBy)}</p>` : ""}
+      </div>
+      <p class="figure">${escapeHtml(d.total)}</p>
+    </section>
+
+    ${inv.showAmountInWords ? `<p class="words">Amount in words: <span>${escapeHtml(d.words)}</span></p>` : ""}
+    ${buckets}
+    ${notes}
+
+    <section class="close">
+      <div>${payment}${terms}</div>
+      ${signature}
+    </section>
+`;
+  const figure = rc ? rc.amount : d.total;
 
   return `<!doctype html>
 <html lang="en-IN">
@@ -170,10 +227,13 @@ export function invoiceToHtml(invoice: Invoice, assets: ExportAssets<string>): s
   .grand { display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid #0a0a0a; margin-top: 12pt; padding-top: 10pt; }
   .grand .label { font-size: 7.5pt; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; color: #494949; }
   .grand .payable { font-size: 9pt; color: #242424; margin-top: 3pt; }
-  .grand .figure { font-size: ${d.total.length <= 12 ? 40 : d.total.length <= 14 ? 34 : 28}pt; letter-spacing: -.03em; line-height: 1; }
+  .grand .figure { font-size: ${figure.length <= 12 ? 40 : figure.length <= 14 ? 34 : 28}pt; letter-spacing: -.03em; line-height: 1; }
   .words { margin-top: 16pt; font-size: 8.5pt; color: #494949; }
   .words span { color: #0a0a0a; }
   .summary, .notes { margin-top: 20pt; }
+  .notes.flush { margin-top: 0; }
+  .receipt-sentence { font-size: 10pt; line-height: 1.6; color: #242424; }
+  .receipt-sentence strong { font-weight: 500; color: #0a0a0a; }
   .close { display: grid; grid-template-columns: 1fr 190pt; gap: 28pt; margin-top: 20pt; }
   .kv { display: grid; grid-template-columns: 56pt 1fr; row-gap: 2pt; font-size: 8.5pt; }
   .kv dt { color: #494949; }
@@ -205,7 +265,7 @@ export function invoiceToHtml(invoice: Invoice, assets: ExportAssets<string>): s
 
     <section class="parties">
       ${party("From", inv.seller, sellerTax)}
-      ${party("Billed to", inv.buyer, buyerTax)}
+      ${party(rc ? "Received from" : "Billed to", inv.buyer, buyerTax)}
     </section>
 
     <section class="meta">
@@ -213,31 +273,7 @@ export function invoiceToHtml(invoice: Invoice, assets: ExportAssets<string>): s
     </section>
 
     <div class="rule"></div>
-
-    <table class="items">
-      ${head}
-      ${rows}
-    </table>
-
-    <div class="ladder">${ladder}</div>
-
-    <section class="grand">
-      <div>
-        <p class="label">Total due</p>
-        ${d.payableBy ? `<p class="payable">${escapeHtml(d.payableBy)}</p>` : ""}
-      </div>
-      <p class="figure">${escapeHtml(d.total)}</p>
-    </section>
-
-    ${inv.showAmountInWords ? `<p class="words">Amount in words: <span>${escapeHtml(d.words)}</span></p>` : ""}
-    ${buckets}
-    ${inv.notes.trim() ? `<section class="notes"><p class="overline">Notes</p><p class="body">${lines(inv.notes)}</p></section>` : ""}
-
-    <section class="close">
-      <div>${payment}${terms}</div>
-      ${signature}
-    </section>
-
+${rc ? receiptBody : invoiceBody}
     <footer class="footer">
       <p>${escapeHtml(d.footer)}</p>
       <p class="copyright">${inv.showLogo ? `<img src="${escapeHtml(assets.logo)}" alt="">` : ""}${escapeHtml(d.copyright)}</p>

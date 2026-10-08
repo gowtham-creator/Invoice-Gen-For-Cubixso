@@ -14,7 +14,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { ChevronRight, Eye, Loader2 } from "lucide-react";
 import type { Invoice } from "@/lib/invoice-types";
-import { computeTotals } from "@/lib/invoice-math";
+import { computeTotals, receiptBalance } from "@/lib/invoice-math";
+import { paymentModeLabel, receiptOf } from "@/lib/defaults";
 import { currencyOf, formatMoney } from "@/lib/currency";
 import { getInvoice, markExported, saveInvoiceContent } from "@/lib/storage";
 import { Editor } from "./editor";
@@ -114,6 +115,8 @@ function Loaded({
   const totals = useMemo(() => computeTotals(invoice), [invoice]);
   const currency = currencyOf(invoice.currencyCode);
   const isGst = invoice.kind === "gst";
+  const receipt = invoice.kind === "receipt" ? receiptOf(invoice) : null;
+  const balance = receipt ? receiptBalance(receipt) : null;
 
   return (
     <main className="flex h-dvh flex-col overflow-hidden">
@@ -153,7 +156,7 @@ function Loaded({
             onChange={setPane}
             options={[
               { value: "edit", label: "Edit" },
-              { value: "preview", label: "Invoice" },
+              { value: "preview", label: receipt ? "Receipt" : "Invoice" },
             ]}
           />
         </div>
@@ -176,16 +179,39 @@ function Loaded({
           {/* The total, always in view while editing. */}
           <div className="shrink-0 border-t border-line bg-canvas px-5 py-3">
             <div className="mx-auto flex max-w-[640px] items-end justify-between gap-4 lg:max-w-none">
-              <div className="min-w-0">
-                <p className="text-[12px] font-medium text-ink-2">Total due</p>
-                <p className="tnum truncate text-[12px] text-ink-3">
-                  {formatMoney(totals.taxableMinor, currency)}
-                  {totals.taxMinor > 0 ? ` + ${formatMoney(totals.taxMinor, currency)} GST` : isGst ? "" : " · no GST"}
-                </p>
-              </div>
-              <p className="tnum shrink-0 text-[20px] font-semibold tracking-[-0.01em] text-ink">
-                {formatMoney(totals.grandTotalMinor, currency)}
-              </p>
+              {receipt ? (
+                <>
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-medium text-ink-2">Amount received</p>
+                    <p className="tnum truncate text-[12px] text-ink-3">
+                      {paymentModeLabel(receipt.mode)}
+                      {balance?.balanceMinor != null && receipt.againstInvoice.trim()
+                        ? balance.excessMinor > 0
+                          ? ` · ${formatMoney(balance.excessMinor, currency)} in excess`
+                          : balance.balanceMinor === 0
+                            ? " · paid in full"
+                            : ` · ${formatMoney(balance.balanceMinor, currency)} balance due`
+                        : ""}
+                    </p>
+                  </div>
+                  <p className="tnum shrink-0 text-[20px] font-semibold tracking-[-0.01em] text-ink">
+                    {formatMoney(receipt.amountMinor, currency)}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-medium text-ink-2">Total due</p>
+                    <p className="tnum truncate text-[12px] text-ink-3">
+                      {formatMoney(totals.taxableMinor, currency)}
+                      {totals.taxMinor > 0 ? ` + ${formatMoney(totals.taxMinor, currency)} GST` : isGst ? "" : " · no GST"}
+                    </p>
+                  </div>
+                  <p className="tnum shrink-0 text-[20px] font-semibold tracking-[-0.01em] text-ink">
+                    {formatMoney(totals.grandTotalMinor, currency)}
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </aside>

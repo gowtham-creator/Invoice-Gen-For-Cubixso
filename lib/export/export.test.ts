@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import JSZip from "jszip";
 import { Packer } from "docx";
-import { blankInvoice, emptyItem } from "../defaults.ts";
+import { blankInvoice, blankReceipt, emptyItem } from "../defaults.ts";
 import { invoiceToHtml } from "./html.ts";
 import { buildInvoiceDocx, type DocxImage } from "./docx.ts";
 import { copyrightLine, exportFileName } from "./shared.ts";
@@ -103,4 +103,68 @@ test("every footer carries a copyright dated to the invoice, not to today", () =
   const blankSeller = coltec({ issueDate: "2026-01-02" });
   blankSeller.seller = { ...blankSeller.seller, name: "  " };
   assert.equal(copyrightLine(blankSeller), "© 2026 CUBIXSO Solutions Private Limited. All rights reserved.");
+});
+
+/** Receipt R-001: the first ₹1,00,000 tranche against Invoice #003. */
+function receipt(over: Partial<Invoice["receipt"] & object> = {}): Invoice {
+  const base = blankInvoice("receipt");
+  return {
+    ...base,
+    number: "R-001",
+    buyer: { ...base.buyer, name: "Coltec India Private Limited", state: "Telangana" },
+    receipt: {
+      ...blankReceipt(),
+      amountMinor: 100_000_00,
+      reference: "UTR AXISN26281123456",
+      purpose: "Milestone 1 of 3",
+      againstInvoice: "003",
+      invoiceTotalMinor: 259_600_00,
+      ...over,
+    },
+  };
+}
+
+test("a receipt's HTML acknowledges the amount, in figures and words, and is not a tax invoice", () => {
+  const html = invoiceToHtml(receipt(), htmlAssets);
+  assert.match(html, /PAYMENT RECEIPT|Payment Receipt/);
+  assert.match(html, /Received with thanks from Coltec India Private Limited the sum of <strong>₹1,00,000\.00<\/strong>/);
+  assert.match(html, /One Lakh/, "amount in words");
+  assert.match(html, /towards Milestone 1 of 3 against Invoice No\. 003\./);
+  assert.match(html, /Balance due[\s\S]*₹1,59,600\.00/);
+  assert.match(html, /Not a tax invoice/);
+  assert.match(html, /Received from/);
+  assert.doesNotMatch(html, /Payment details|Total due|Received earlier/);
+});
+
+test("a receipt without a purpose or an invoice drops those clauses and the balance", () => {
+  const html = invoiceToHtml(receipt({ purpose: "", againstInvoice: "", invoiceTotalMinor: null }), htmlAssets);
+  assert.match(html, /One Lakh[^<]*Only\)\.<\/p>/);
+  assert.doesNotMatch(html, /towards|against Invoice|Balance due/);
+});
+
+test("a receipt's purpose and reference cannot become markup", () => {
+  const html = invoiceToHtml(
+    receipt({ purpose: '<script>alert("x")</script>', reference: "<img src=x onerror=alert(1)>" }),
+    htmlAssets,
+  );
+  assert.doesNotMatch(html, /<script>alert/);
+  assert.doesNotMatch(html, /<img src=x/);
+  assert.match(html, /towards &lt;script&gt;alert\(&quot;x&quot;\)&lt;\/script&gt;/);
+  assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
+});
+
+test("a receipt's Word file says the same as its HTML", async () => {
+  const doc = buildInvoiceDocx(receipt(), { logo: img("cubixso-logo.png", 1584, 1584), signature: img("signature.png", 737, 99), seal: img("seal.png", 597, 600) });
+  const zip = await JSZip.loadAsync(await Packer.toBuffer(doc));
+  const text = (await zip.file("word/document.xml")!.async("string")).replace(/<[^>]+>/g, "");
+  for (const want of ["Payment Receipt", "Received from", "Received with thanks from Coltec India Private Limited", "₹1,00,000.00", "One Lakh", "against Invoice No. 003", "₹1,59,600.00", "Amount received", "Authorised Signatory"]) {
+    assert.ok(text.includes(want), `document contains ${want}`);
+  }
+  assert.ok(!text.includes("Payment details"), "no bank details on a receipt");
+  const footer = Object.keys(zip.files).find((f) => /^word\/footer\d*\.xml$/.test(f))!;
+  assert.match(await zip.file(footer)!.async("string"), /Payment receipt\. Not a tax invoice\./);
+});
+
+test("a receipt's file name says it is a receipt", () => {
+  assert.equal(exportFileName(receipt(), "pdf"), "Receipt-R-001-Coltec-India-Private-Limited.pdf");
 });

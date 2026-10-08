@@ -9,7 +9,7 @@
  * not constants.
  */
 
-import type { BankDetails, Invoice, LineItem, Party } from "./invoice-types";
+import type { BankDetails, Invoice, LineItem, Party, PaymentMode, ReceiptDetails } from "./invoice-types";
 
 export const SELLER_STATE = "Telangana";
 
@@ -163,6 +163,39 @@ function plusDays(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+export const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
+  { value: "bank-transfer", label: "Bank transfer" },
+  { value: "upi", label: "UPI" },
+  { value: "cheque", label: "Cheque" },
+  { value: "cash", label: "Cash" },
+  { value: "card", label: "Card" },
+  { value: "other", label: "Other" },
+];
+
+export function paymentModeLabel(mode: PaymentMode): string {
+  return PAYMENT_MODES.find((m) => m.value === mode)?.label ?? "Other";
+}
+
+export function blankReceipt(): ReceiptDetails {
+  return {
+    amountMinor: 0,
+    mode: "bank-transfer",
+    reference: "",
+    purpose: "",
+    againstInvoice: "",
+    invoiceTotalMinor: null,
+    receivedEarlierMinor: 0,
+  };
+}
+
+/**
+ * A receipt's details, whatever the record holds. Only a receipt has them, and
+ * one written by hand or by an older build may be missing a field.
+ */
+export function receiptOf(inv: Pick<Invoice, "receipt">): ReceiptDetails {
+  return { ...blankReceipt(), ...(inv.receipt ?? {}) };
+}
+
 export function blankInvoice(kind: Invoice["kind"] = "gst"): Invoice {
   return {
     kind,
@@ -187,5 +220,6 @@ export function blankInvoice(kind: Invoice["kind"] = "gst"): Invoice {
     showStamp: true,
     signatureImage: null,
     accent: "#0066cc",
+    ...(kind === "receipt" ? { number: "R-001", receipt: blankReceipt() } : {}),
   };
 }

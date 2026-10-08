@@ -10,17 +10,23 @@
  *
  * Totals are summed only across rupee invoices. Adding dollars to rupees would
  * produce a number that means nothing, and a wrong total is worse than none.
+ *
+ * Payment receipts share the list. They are never counted as billing: a
+ * receipt is money in against an invoice already counted. Instead they mark
+ * the invoice they pay towards as part paid or paid.
  */
 
 import { useMemo, useState } from "react";
 import {
-  ChevronDown, Code2, Copy, Eye, FilePlus2, FileText, FileType2, MoreHorizontal, PencilLine, Search, Trash2,
+  ChevronDown, Code2, Copy, Eye, FilePlus2, FileText, FileType2, MoreHorizontal, PencilLine, ReceiptText, Search, Trash2,
 } from "lucide-react";
 import { computeTotals } from "@/lib/invoice-math";
 import { currencyOf, formatMoney } from "@/lib/currency";
 import {
-  createInvoice, deleteInvoice, duplicateInvoice, listInvoices, markExported, restoreInvoice, type InvoiceRecord,
+  createInvoice, createReceiptFor, deleteInvoice, duplicateInvoice, listInvoices, markExported, receivedAgainst,
+  restoreInvoice, type InvoiceRecord,
 } from "@/lib/storage";
+import { receiptOf } from "@/lib/defaults";
 import { exportInvoice } from "@/lib/export/browser";
 import { fmtDate, type ExportFormat } from "@/lib/export/shared";
 import type { Invoice } from "@/lib/invoice-types";
@@ -32,6 +38,10 @@ import { useToast } from "./toast";
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 
+const isReceipt = (r: InvoiceRecord) => r.invoice.kind === "receipt";
+/** "Invoice 003" or "Receipt R-001", for menus and messages. */
+const docName = (inv: Invoice) => `${inv.kind === "receipt" ? "Receipt" : "Invoice"} ${inv.number}`;
+
 export function Home({ go }: { go: (r: Route) => void }) {
   const [records, setRecords] = useState<InvoiceRecord[]>(() => listInvoices());
   const [query, setQuery] = useState("");
@@ -40,18 +50,35 @@ export function Home({ go }: { go: (r: Route) => void }) {
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return records;
+    // A receipt is also found by the invoice it pays, so searching "003"
+    // brings up the invoice and every receipt against it.
     return records.filter(
-      (r) => r.invoice.buyer.name.toLowerCase().includes(q) || r.invoice.number.toLowerCase().includes(q),
+      (r) =>
+        r.invoice.buyer.name.toLowerCase().includes(q) ||
+        r.invoice.number.toLowerCase().includes(q) ||
+        (isReceipt(r) && receiptOf(r.invoice).againstInvoice.toLowerCase().includes(q)),
     );
   }, [records, query]);
 
-  const inrBilled = useMemo(
-    () =>
-      records
-        .filter((r) => r.invoice.currencyCode === "INR")
-        .reduce((sum, r) => sum + computeTotals(r.invoice).grandTotalMinor, 0),
-    [records],
-  );
+  const { invoiceCount, receiptCount, inrBilled, inrReceived } = useMemo(() => {
+    const inr = records.filter((r) => r.invoice.currencyCode === "INR");
+    return {
+      invoiceCount: records.filter((r) => !isReceipt(r)).length,
+      receiptCount: records.filter(isReceipt).length,
+      inrBilled: inr.filter((r) => !isReceipt(r)).reduce((sum, r) => sum + computeTotals(r.invoice).grandTotalMinor, 0),
+      inrReceived: inr.filter(isReceipt).reduce((sum, r) => sum + receiptOf(r.invoice).amountMinor, 0),
+    };
+  }, [records]);
+
+  const inr = currencyOf("INR");
+  const summary = [
+    `${invoiceCount} ${invoiceCount === 1 ? "invoice" : "invoices"}`,
+    receiptCount > 0 ? `${receiptCount} ${receiptCount === 1 ? "receipt" : "receipts"}` : "",
+    inrBilled > 0 ? `${formatMoney(inrBilled, inr)} billed` : "",
+    inrReceived > 0 ? `${formatMoney(inrReceived, inr)} received` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   const start = (kind: Invoice["kind"]) => go({ name: "invoice", id: createInvoice(kind).id });
 
@@ -59,7 +86,7 @@ export function Home({ go }: { go: (r: Route) => void }) {
     try {
       await exportInvoice(r.invoice, format);
       setRecords(markExported(r.id));
-      toast({ tone: "success", message: `Invoice ${r.invoice.number} downloaded` });
+      toast({ tone: "success", message: `${docName(r.invoice)} downloaded` });
     } catch (e) {
       toast({ tone: "error", message: `Could not export: ${e instanceof Error ? e.message : String(e)}` });
     }
@@ -69,7 +96,7 @@ export function Home({ go }: { go: (r: Route) => void }) {
     setRecords(deleteInvoice(r.id));
     toast({
       tone: "success",
-      message: `Invoice ${r.invoice.number} deleted`,
+      message: `${docName(r.invoice)} deleted`,
       action: { label: "Undo", onClick: () => setRecords(restoreInvoice(r)) },
     });
   };
@@ -92,11 +119,7 @@ export function Home({ go }: { go: (r: Route) => void }) {
           <div>
             <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-ink">Invoices</h1>
             <p className="tnum mt-1 text-[13px] text-ink-3">
-              {records.length === 0
-                ? "Nothing yet"
-                : `${records.length} ${records.length === 1 ? "invoice" : "invoices"}${
-                    inrBilled > 0 ? ` · ${formatMoney(inrBilled, currencyOf("INR"))} billed` : ""
-                  }`}
+              {records.length === 0 ? "Nothing yet" : summary}
             </p>
           </div>
           {records.length > 0 && (
@@ -133,12 +156,17 @@ export function Home({ go }: { go: (r: Route) => void }) {
                   <Row
                     key={r.id}
                     record={r}
+                    receivedMinor={isReceipt(r) ? 0 : receivedAgainst(records, r.invoice.number, r.invoice.currencyCode)}
                     onOpen={() => go({ name: "invoice", id: r.id })}
                     onPreview={() => go({ name: "preview", id: r.id })}
                     onExport={(f) => exportRow(r, f)}
                     onDuplicate={() => {
                       const copy = duplicateInvoice(r.id);
                       if (copy) go({ name: "invoice", id: copy.id });
+                    }}
+                    onIssueReceipt={() => {
+                      const receipt = createReceiptFor(r.id);
+                      if (receipt) go({ name: "invoice", id: receipt.id });
                     }}
                     onDelete={() => remove(r)}
                   />
@@ -154,35 +182,56 @@ export function Home({ go }: { go: (r: Route) => void }) {
 
 function Row({
   record,
+  receivedMinor,
   onOpen,
   onPreview,
   onExport,
   onDuplicate,
+  onIssueReceipt,
   onDelete,
 }: {
   record: InvoiceRecord;
+  /** For an invoice: what its receipts add up to, in its own currency. */
+  receivedMinor: number;
   onOpen: () => void;
   onPreview: () => void;
   onExport: (f: ExportFormat) => void;
   onDuplicate: () => void;
+  onIssueReceipt: () => void;
   onDelete: () => void;
 }) {
   const inv = record.invoice;
-  const total = formatMoney(computeTotals(inv).grandTotalMinor, currencyOf(inv.currencyCode));
-  const status = record.exportedAt ? `Exported ${shortDate(record.exportedAt)}` : "Draft";
+  const receipt = inv.kind === "receipt";
+  const c = currencyOf(inv.currencyCode);
+  const totalMinor = receipt ? receiptOf(inv).amountMinor : computeTotals(inv).grandTotalMinor;
+  const total = formatMoney(totalMinor, c);
+  // An invoice's receipts say more than whether it was exported: once money
+  // has come in against it, that is its status.
+  const paid = !receipt && receivedMinor > 0 && receivedMinor >= totalMinor;
+  const partPaid = !receipt && receivedMinor > 0 && receivedMinor < totalMinor;
+  const status = paid
+    ? "Paid"
+    : partPaid
+      ? `Part paid · ${formatMoney(receivedMinor, c)}`
+      : record.exportedAt
+        ? `Exported ${shortDate(record.exportedAt)}`
+        : "Draft";
+  const name = docName(inv);
 
   return (
     <li className="group relative grid grid-cols-[1fr_auto_40px] items-center gap-3 px-4 py-3 transition-colors duration-100 hover:bg-well sm:grid-cols-[56px_1fr_100px_124px_116px_40px] lg:grid-cols-[72px_1fr_120px_150px_140px_40px]">
       {/* The whole row opens the invoice; the menu sits above this layer. */}
-      <button type="button" onClick={onOpen} className="absolute inset-0 rounded-none" aria-label={`Open invoice ${inv.number}`} />
+      <button type="button" onClick={onOpen} className="absolute inset-0 rounded-none" aria-label={`Open ${name.toLowerCase()}`} />
       <span className="tnum pointer-events-none hidden text-[13px] text-ink-2 sm:block">{inv.number}</span>
       <span className="pointer-events-none min-w-0">
         <span className="flex items-center gap-2">
           <span className={`truncate text-[13px] font-medium ${inv.buyer.name ? "text-ink" : "text-ink-3"}`}>
             {inv.buyer.name || "No client yet"}
           </span>
-          {inv.kind === "non-gst" ? (
-            <span className="shrink-0 rounded bg-well px-1.5 py-px text-[11px] text-ink-2 ring-1 ring-line ring-inset">No GST</span>
+          {inv.kind === "non-gst" || receipt ? (
+            <span className="shrink-0 rounded bg-well px-1.5 py-px text-[11px] text-ink-2 ring-1 ring-line ring-inset">
+              {receipt ? "Receipt" : "No GST"}
+            </span>
           ) : null}
         </span>
         <span className="tnum mt-0.5 block truncate text-[12px] text-ink-3 sm:hidden">
@@ -190,13 +239,17 @@ function Row({
         </span>
       </span>
       <span className="tnum pointer-events-none hidden text-[13px] text-ink-2 sm:block">{fmtDate(inv.issueDate)}</span>
-      <span className={`pointer-events-none hidden text-[13px] sm:block ${record.exportedAt ? "text-ink-2" : "text-ink-3"}`}>
+      <span
+        className={`pointer-events-none hidden truncate text-[13px] sm:block ${
+          paid ? "font-medium text-ink" : partPaid || record.exportedAt ? "text-ink-2" : "text-ink-3"
+        }`}
+      >
         {status}
       </span>
       <span className="tnum pointer-events-none text-right text-[13px] font-medium text-ink">{total}</span>
       <div className="relative z-10 justify-self-end">
         <Menu
-          label={`Invoice ${inv.number}`}
+          label={name}
           items={[
             { label: "Open", icon: <PencilLine size={15} />, onSelect: onOpen },
             { label: "Preview", icon: <Eye size={15} />, onSelect: onPreview },
@@ -206,13 +259,14 @@ function Row({
             { label: "HTML page", hint: ".html", icon: <Code2 size={15} />, onSelect: () => onExport("html") },
             "separator",
             { label: "Duplicate", icon: <Copy size={15} />, onSelect: onDuplicate },
+            ...(receipt ? [] : [{ label: "Issue receipt", icon: <ReceiptText size={15} />, onSelect: onIssueReceipt }]),
             { label: "Delete", icon: <Trash2 size={15} />, danger: true, onSelect: onDelete },
           ]}
           trigger={(props) => (
             <button
               type="button"
               {...props}
-              aria-label={`Actions for invoice ${inv.number}`}
+              aria-label={`Actions for ${name.toLowerCase()}`}
               className="grid size-8 pointer-coarse:size-10 place-items-center rounded-md text-ink-3 transition-colors duration-150 hover:bg-line hover:text-ink aria-expanded:bg-line aria-expanded:text-ink"
             >
               <MoreHorizontal size={16} />
@@ -238,9 +292,11 @@ function NewInvoice({ onStart }: { onStart: (kind: Invoice["kind"]) => void }) {
         items={[
           { label: "Tax invoice", hint: "GST", icon: <FileText size={15} />, onSelect: () => onStart("gst") },
           { label: "Invoice, no GST", hint: "0%", icon: <FileText size={15} />, onSelect: () => onStart("non-gst") },
+          "separator",
+          { label: "Receipt", hint: "Payment", icon: <ReceiptText size={15} />, onSelect: () => onStart("receipt") },
         ]}
         trigger={(props) => (
-          <button type="button" {...props} aria-label="Choose the kind of invoice" className={`${base} rounded-r-md border-l border-white/20 px-2`}>
+          <button type="button" {...props} aria-label="Choose the kind of document" className={`${base} rounded-r-md border-l border-white/20 px-2`}>
             <ChevronDown size={15} />
           </button>
         )}

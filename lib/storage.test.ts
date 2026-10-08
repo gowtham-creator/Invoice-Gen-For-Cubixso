@@ -141,3 +141,90 @@ test("deleting removes only that invoice", async () => {
   deleteInvoice(a.id);
   assert.deepEqual(listInvoices().map((r) => r.id), [b.id]);
 });
+
+test("receipts are numbered in their own series", async () => {
+  const { createInvoice } = await import("./storage.ts");
+  assert.equal(createInvoice("receipt").invoice.number, "R-001");
+  assert.equal(createInvoice("receipt").invoice.number, "R-002");
+});
+
+test("receipts never take or move on an invoice number, and invoices never move receipts", async () => {
+  const { createInvoice, nextInvoiceNumber, nextReceiptNumber, listInvoices } = await import("./storage.ts");
+  createInvoice("gst");
+  createInvoice("non-gst");
+  assert.equal(nextInvoiceNumber(listInvoices()), "003");
+  createInvoice("receipt");
+  createInvoice("receipt");
+  assert.equal(nextInvoiceNumber(listInvoices()), "003", "receipts leave the invoice series alone");
+  assert.equal(createInvoice("gst").invoice.number, "003");
+  assert.equal(nextReceiptNumber(listInvoices()), "R-003", "invoices leave the receipt series alone");
+});
+
+test("a receipt issued for an invoice is prefilled from it, net of earlier receipts", async () => {
+  const { createInvoice, createReceiptFor, saveInvoiceContent, getInvoice } = await import("./storage.ts");
+  const inv = createInvoice("gst");
+  // Invoice #003 (COLTEC): two panels at ₹1,10,000 plus 18% GST is ₹2,59,600.
+  saveInvoiceContent(inv.id, {
+    ...inv.invoice,
+    number: "003",
+    buyer: { ...inv.invoice.buyer, name: "Coltec India Private Limited", state: "Telangana" },
+    signatoryName: "A. Signatory",
+    items: [{ ...inv.invoice.items[0], description: "Panel", quantity: 2, unitPriceMinor: 110_000_00, taxRatePercent: 18 }],
+  });
+
+  const first = createReceiptFor(inv.id)!;
+  const r1 = first.invoice;
+  assert.equal(r1.kind, "receipt");
+  assert.equal(r1.number, "R-001");
+  assert.equal(r1.buyer.name, "Coltec India Private Limited");
+  assert.equal(r1.signatoryName, "A. Signatory");
+  assert.equal(r1.currencyCode, "INR");
+  assert.equal(r1.receipt?.againstInvoice, "003");
+  assert.equal(r1.receipt?.invoiceTotalMinor, 259_600_00);
+  assert.equal(r1.receipt?.receivedEarlierMinor, 0);
+  assert.equal(r1.receipt?.amountMinor, 259_600_00, "the whole balance, to be edited down for a tranche");
+  assert.equal(r1.receipt?.mode, "bank-transfer");
+
+  saveInvoiceContent(first.id, { ...r1, receipt: { ...r1.receipt!, amountMinor: 100_000_00 } });
+  // A receipt in another currency, or against another invoice, is not counted.
+  const stray = createInvoice("receipt");
+  saveInvoiceContent(stray.id, { ...stray.invoice, currencyCode: "USD", receipt: { ...stray.invoice.receipt!, againstInvoice: "003", amountMinor: 500_00 } });
+  const other = createInvoice("receipt");
+  saveInvoiceContent(other.id, { ...other.invoice, receipt: { ...other.invoice.receipt!, againstInvoice: "004", amountMinor: 700_00 } });
+
+  const second = createReceiptFor(inv.id)!.invoice;
+  assert.equal(second.number, "R-004");
+  assert.equal(second.receipt?.receivedEarlierMinor, 100_000_00);
+  assert.equal(second.receipt?.amountMinor, 159_600_00);
+  assert.equal(getInvoice(inv.id)?.invoice.number, "003", "the invoice is untouched");
+  assert.equal(createReceiptFor(first.id), null, "a receipt takes no receipt");
+});
+
+test("the remaining balance on a receipt is never negative", async () => {
+  const { createInvoice, createReceiptFor, saveInvoiceContent } = await import("./storage.ts");
+  const inv = createInvoice("non-gst");
+  saveInvoiceContent(inv.id, { ...inv.invoice, items: [{ ...inv.invoice.items[0], unitPriceMinor: 1_000_00 }] });
+  const r = createReceiptFor(inv.id)!;
+  saveInvoiceContent(r.id, { ...r.invoice, receipt: { ...r.invoice.receipt!, amountMinor: 1_500_00 } });
+  assert.equal(createReceiptFor(inv.id)!.invoice.receipt?.amountMinor, 0);
+});
+
+test("duplicating a receipt stays in the receipt series", async () => {
+  const { createInvoice, duplicateInvoice, nextInvoiceNumber, listInvoices } = await import("./storage.ts");
+  createInvoice("gst");
+  const r = createInvoice("receipt");
+  const copy = duplicateInvoice(r.id)!;
+  assert.equal(copy.invoice.kind, "receipt");
+  assert.equal(copy.invoice.number, "R-002");
+  assert.equal(nextInvoiceNumber(listInvoices()), "002");
+  const invCopy = duplicateInvoice(listInvoices().find((x) => x.invoice.kind === "gst")!.id)!;
+  assert.equal(invCopy.invoice.number, "002", "duplicating an invoice still takes the next invoice number");
+});
+
+test("an invoice stored before receipts existed has no receipt details", async () => {
+  stubStorage({ [RECORDS_KEY]: [{ id: "a", invoice: v1Invoice("001", "Coltec"), createdAt: "2026-09-10T10:00:00Z", updatedAt: "2026-09-10T10:00:00Z" }] });
+  const { listInvoices } = await import("./storage.ts");
+  const [r] = listInvoices();
+  assert.equal(r.invoice.kind, "gst");
+  assert.equal(r.invoice.receipt, undefined);
+});
