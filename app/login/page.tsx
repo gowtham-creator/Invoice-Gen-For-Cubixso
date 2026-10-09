@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { SignIn } from "@/components/sign-in";
 
 /**
- * The one page the CDN serves to a signed-out visitor (see netlify.toml). It
+ * The one page served to a signed-out visitor (see proxy.ts). It
  * follows the device's light or dark setting only and has no theme toggle;
  * the toggle is inside the app, after signing in.
  */

@@ -1,20 +1,12 @@
 import type { NextConfig } from "next";
 
 /**
- * Built as a static export.
- *
- * The whole app runs in the browser: the editor holds its state in React, the
- * PDF is rendered client-side by @react-pdf/renderer, and drafts persist to
- * localStorage. There is no server route, no data fetching and nothing to
- * render on a server, so shipping serverless functions would add moving parts
- * that do no work.
- *
- * A static export is also the most robust thing to hand a CDN — plain files,
- * no runtime version to drift, nothing to cold-start.
+ * The app runs in the browser: the editor holds its state in React, the PDF is
+ * rendered client-side, and invoices persist to localStorage. The one server
+ * piece is the sign-in lock (proxy.ts and app/api/login), which is why this is
+ * a regular Next.js build on Vercel rather than a static export.
  */
 const nextConfig: NextConfig = {
-  output: "export",
-
   // The export has no server to run the image optimiser. The app uses plain
   // <img> for the signature preview rather than next/image, so this only
   // guards against a future import reintroducing the dependency.
