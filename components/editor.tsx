@@ -173,9 +173,16 @@ export function Editor({
             {taxed ? (
               <Field label="GSTIN" value={invoice.buyer.gstin} onChange={(gstin) => setParty("buyer", { gstin })} mono placeholder="36AAAAA0000A1Z5" />
             ) : (
-              <Field label="PAN" value={invoice.buyer.pan} onChange={(pan) => setParty("buyer", { pan })} mono />
+              <Field label="PAN" value={invoice.buyer.pan} onChange={(pan) => setParty("buyer", { pan })} mono placeholder="AAAPL1234C" />
             )}
           </Row>
+          {/* A client's PAN is printed on every document when given: many need
+              it on a tax invoice too, for TDS. */}
+          {taxed && (
+            <Row>
+              <Field label="PAN" value={invoice.buyer.pan} onChange={(pan) => setParty("buyer", { pan })} mono placeholder="AAAPL1234C" />
+            </Row>
+          )}
           <Row>
             <Field label="Email" type="email" value={invoice.buyer.email} onChange={(email) => setParty("buyer", { email })} />
             <Field label="Phone" type="tel" value={invoice.buyer.phone} onChange={(phone) => setParty("buyer", { phone })} />

@@ -26,7 +26,7 @@ import { computeTotals, effectivePlaceOfSupply } from "../lib/invoice-math";
 import { currencyOf, formatMoney } from "../lib/currency";
 import { amountInWords } from "../lib/amount-in-words";
 import { formatPlaceOfSupply, isCustomSignature } from "../lib/defaults";
-import { copyrightLine, describeReceipt } from "../lib/export/shared";
+import { buyerTaxLine, copyrightLine, describeReceipt } from "../lib/export/shared";
 import { FONT, PAGE_MARGIN, PALETTES, liftForDark, totalSize, typeFor, type Palette, type Variant } from "./theme";
 
 Font.register({
@@ -610,9 +610,7 @@ function Parties({ invoice, s, taxed, buyerLabel }: { invoice: Invoice; s: Style
         <Eyebrow s={s}>{buyerLabel}</Eyebrow>
         <Text style={s.partyName}>{invoice.buyer.name || "—"}</Text>
         <Lines text={invoice.buyer.address} style={s.partyLine} />
-        {taxed && invoice.buyer.gstin ? (
-          <Text style={s.partyTag}>GSTIN {invoice.buyer.gstin}</Text>
-        ) : null}
+        {buyerTaxLine(invoice, taxed) ? <Text style={s.partyTag}>{buyerTaxLine(invoice, taxed)}</Text> : null}
         {invoice.buyer.email ? <Text style={s.partyLine}>{invoice.buyer.email}</Text> : null}
         {invoice.buyer.phone ? <Text style={s.partyLine}>{invoice.buyer.phone}</Text> : null}
       </View>

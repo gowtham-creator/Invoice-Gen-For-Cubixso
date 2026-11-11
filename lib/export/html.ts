@@ -13,7 +13,7 @@
  */
 
 import type { Invoice } from "../invoice-types";
-import { describe, fmtDate, type ExportAssets } from "./shared";
+import { describe, fmtDate, type ExportAssets, buyerTaxLine } from "./shared";
 
 export function escapeHtml(value: string): string {
   return value
@@ -48,7 +48,7 @@ export function invoiceToHtml(invoice: Invoice, assets: ExportAssets<string>): s
   // it is the same business acknowledging the same client.
   const taxed = d.isGst || !!rc;
   const sellerTax = taxed ? (inv.seller.gstin ? `GSTIN ${inv.seller.gstin}` : "") : inv.seller.pan ? `PAN ${inv.seller.pan}` : "";
-  const buyerTax = taxed && inv.buyer.gstin ? `GSTIN ${inv.buyer.gstin}` : "";
+  const buyerTax = buyerTaxLine(inv, taxed);
 
   const meta = rc
     ? rc.meta

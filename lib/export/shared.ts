@@ -12,6 +12,17 @@ import { formatPlaceOfSupply, paymentModeLabel, receiptOf } from "../defaults";
 
 export type ExportFormat = "pdf" | "docx" | "html";
 
+/**
+ * The client's tax identifiers, as printed under their name: GSTIN where GST
+ * applies, and PAN whenever one is given, which some clients need on every
+ * invoice for TDS. The PDF, Word and HTML exports all print this line.
+ */
+export function buyerTaxLine(invoice: Invoice, taxed: boolean): string {
+  const gstin = (invoice.buyer.gstin ?? "").trim();
+  const pan = (invoice.buyer.pan ?? "").trim();
+  return [taxed && gstin ? `GSTIN ${gstin}` : "", pan ? `PAN ${pan}` : ""].filter(Boolean).join(" · ");
+}
+
 /** The copyright line in every footer. The year is the invoice's own, not
     today's, so a reprinted old invoice still reads as it did when issued. */
 export function copyrightLine(invoice: Invoice): string {

@@ -32,7 +32,7 @@ import {
   type ParagraphChild,
 } from "docx";
 import type { Invoice } from "../invoice-types";
-import { describe, fmtDate, type ExportAssets } from "./shared";
+import { describe, fmtDate, type ExportAssets, buyerTaxLine } from "./shared";
 
 /** An image and its natural size, so it can be fitted without distortion. */
 export interface DocxImage {
@@ -190,7 +190,7 @@ export function buildInvoiceDocx(invoice: Invoice, assets: ExportAssets<DocxImag
   // A receipt names both GSTINs when it has them, as the HTML and PDF do.
   const taxed = d.isGst || !!rc;
   const sellerTax = taxed ? (inv.seller.gstin ? `GSTIN ${inv.seller.gstin}` : "") : inv.seller.pan ? `PAN ${inv.seller.pan}` : "";
-  const buyerTax = taxed && inv.buyer.gstin ? `GSTIN ${inv.buyer.gstin}` : "";
+  const buyerTax = buyerTaxLine(inv, taxed);
   const half = Math.floor(CONTENT / 2);
   const parties = table([half, CONTENT - half], [
     new TableRow({
