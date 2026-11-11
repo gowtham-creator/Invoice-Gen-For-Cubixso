@@ -20,7 +20,7 @@ export type ExportFormat = "pdf" | "docx" | "html";
 export function buyerTaxLine(invoice: Invoice, taxed: boolean): string {
   const gstin = (invoice.buyer.gstin ?? "").trim();
   const pan = (invoice.buyer.pan ?? "").trim();
-  return [taxed && gstin ? `GSTIN ${gstin}` : "", pan ? `PAN ${pan}` : ""].filter(Boolean).join(" · ");
+  return [taxed && gstin ? `GSTIN ${gstin}` : "", pan ? `PAN: ${pan}` : ""].filter(Boolean).join(" · ");
 }
 
 /** The copyright line in every footer. The year is the invoice's own, not

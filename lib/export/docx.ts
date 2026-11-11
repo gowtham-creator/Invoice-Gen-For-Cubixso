@@ -189,7 +189,7 @@ export function buildInvoiceDocx(invoice: Invoice, assets: ExportAssets<DocxImag
   const rc = d.receipt;
   // A receipt names both GSTINs when it has them, as the HTML and PDF do.
   const taxed = d.isGst || !!rc;
-  const sellerTax = taxed ? (inv.seller.gstin ? `GSTIN ${inv.seller.gstin}` : "") : inv.seller.pan ? `PAN ${inv.seller.pan}` : "";
+  const sellerTax = taxed ? (inv.seller.gstin ? `GSTIN ${inv.seller.gstin}` : "") : inv.seller.pan ? `PAN: ${inv.seller.pan}` : "";
   const buyerTax = buyerTaxLine(inv, taxed);
   const half = Math.floor(CONTENT / 2);
   const parties = table([half, CONTENT - half], [

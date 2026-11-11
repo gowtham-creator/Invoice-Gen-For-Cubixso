@@ -600,7 +600,7 @@ function Parties({ invoice, s, taxed, buyerLabel }: { invoice: Invoice; s: Style
           <Text style={s.partyTag}>GSTIN {invoice.seller.gstin}</Text>
         ) : null}
         {!taxed && invoice.seller.pan ? (
-          <Text style={s.partyTag}>PAN {invoice.seller.pan}</Text>
+          <Text style={s.partyTag}>PAN: {invoice.seller.pan}</Text>
         ) : null}
         {invoice.seller.email ? <Text style={s.partyLine}>{invoice.seller.email}</Text> : null}
         {invoice.seller.phone ? <Text style={s.partyLine}>{invoice.seller.phone}</Text> : null}

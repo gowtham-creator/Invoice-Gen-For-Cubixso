@@ -47,7 +47,7 @@ export function invoiceToHtml(invoice: Invoice, assets: ExportAssets<string>): s
   // A receipt names both parties' GSTINs when it has them, like a tax invoice:
   // it is the same business acknowledging the same client.
   const taxed = d.isGst || !!rc;
-  const sellerTax = taxed ? (inv.seller.gstin ? `GSTIN ${inv.seller.gstin}` : "") : inv.seller.pan ? `PAN ${inv.seller.pan}` : "";
+  const sellerTax = taxed ? (inv.seller.gstin ? `GSTIN ${inv.seller.gstin}` : "") : inv.seller.pan ? `PAN: ${inv.seller.pan}` : "";
   const buyerTax = buyerTaxLine(inv, taxed);
 
   const meta = rc

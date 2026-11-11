@@ -180,9 +180,9 @@ test("the client's PAN, email and phone print on a tax invoice, beside the GSTIN
   const inv = coltec();
   inv.buyer = { ...inv.buyer, gstin: "36AAACC1234D1Z5", pan: "AAACC1234D", email: "accounts@coltec.in", phone: "+91 99999 88888" };
   const html = invoiceToHtml(inv, htmlAssets);
-  for (const want of ["GSTIN 36AAACC1234D1Z5 · PAN AAACC1234D", "accounts@coltec.in", "+91 99999 88888"]) {
+  for (const want of ["GSTIN 36AAACC1234D1Z5 · PAN: AAACC1234D", "accounts@coltec.in", "+91 99999 88888"]) {
     assert.ok(html.includes(want), `HTML shows ${want}`);
   }
   const plain = invoiceToHtml(coltec({ kind: "non-gst" }), htmlAssets);
-  assert.ok(!/PAN AAACC/.test(plain), "no PAN line when none is given");
+  assert.ok(!/PAN: AAACC/.test(plain), "no PAN line when none is given");
 });
